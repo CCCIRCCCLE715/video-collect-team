@@ -44,6 +44,17 @@ export class TeamClient {
     const items=await this.rpc('list_topics');
     await Promise.all(items.map(async x=>{x.poster=null;if(x.cover_path)try{x.poster=await this.signedCover(x.cover_path);}catch{x.cover_error=true;}}));return items;
   }
+  weeklyState(){return this.rpc('weekly_library_state');}
+  async listWeekly(){
+    const items=await this.rpc('list_weekly_topics');
+    await Promise.all(items.map(async x=>{x.poster=null;if(x.cover_path)try{x.poster=await this.signedCover(x.cover_path);}catch{x.cover_error=true;}}));return items;
+  }
+  setEntryDeleted(id,deleted){return this.rpc('set_entry_deleted',{p_id:id,p_deleted:deleted});}
+  async replaceEntryCover(id,file){
+    let path=null;
+    try{path=await this.upload(file);return await this.rpc('replace_entry_cover',{p_id:id,p_cover_path:path});}
+    catch(e){if(path)await this.cleanup(path);throw e;}
+  }
   async upload(file){
     const base64=btoa(String.fromCharCode(...new Uint8Array(await file.arrayBuffer()).slice(0,12)));
     decodeCover({mime:file.type,base64});if(file.size>2097152)throw Error('封面不能超过 2 MB。');

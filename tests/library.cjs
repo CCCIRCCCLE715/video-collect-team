@@ -57,3 +57,25 @@ denied.elements['delete-confirm'].onclick();
 assert.equal(denied.elements.total.textContent,'2','A failed save must not silently remove a row');
 assert.ok(denied.elements['library-feedback'].textContent.length);
 console.log('PASS: delete confirmation, refresh persistence, export exclusion, restore, cover preview, storage failure');
+const team=load({getItem:()=>null,setItem(){}});
+team.run(`
+ let chosenOwner='one',chosenWeek='2026-10-14',chosenDay='all';
+ window.VideoCollectUI.bind({scope:x=>x.owner_id===chosenOwner,
+ periodFilter:x=>x.week_start===chosenWeek&&(chosenDay==='all'||x.collected_on===chosenDay),
+ groupKey:x=>x.collected_on,canEdit:x=>x.owner_id==='one',renderNavigation(){}});
+ const base={...items[0],origins:['import'],poster:'covers/a.jpg'};
+ window.VideoCollectUI.replaceCatalog([
+ {...base,id:'entry1',owner_id:'one',week_start:'2026-10-14',collected_on:'2026-10-14'},
+ {...base,id:'entry2',owner_id:'two',week_start:'2026-10-14',collected_on:'2026-10-14'},
+ {...base,id:'entry3',owner_id:'one',week_start:'2026-10-21',collected_on:'2026-10-21'}]);
+`);
+assert.equal(team.elements.total.textContent,'1');
+assert.equal(team.run('shareRows().length'),1,'Export must stay within the selected member and week');
+team.run("chosenOwner='two';window.VideoCollectUI.refreshScope();openCover(items[1]);requestDelete(items[1]);");
+assert.equal(team.elements['cover-file'].disabled,true,'Other members can preview but cannot replace a cover');
+assert.equal(team.elements['delete-dialog'].open,false,'Other members cannot open a deletion confirmation');
+team.run("chosenOwner='one';chosenWeek='2026-10-21';window.VideoCollectUI.refreshScope();");
+assert.equal(team.elements.total.textContent,'1');
+team.run("chosenDay='2026-10-22';window.VideoCollectUI.refreshScope();");
+assert.equal(team.elements.total.textContent,'0','Specific-date navigation must filter actual collection dates');
+console.log('PASS: member, weekly and daily scope, export scope, read-only covers and deletion');

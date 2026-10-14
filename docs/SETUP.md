@@ -73,3 +73,9 @@ window.VIDEO_COLLECT_TEAM = {
 Free 项目长期不活跃可能暂停，到控制台恢复即可。免费方案没有自动备份；团队应定期导出数据库，并备份 Storage 的封面文件。仅网页“导出筛选结果”适合分享选题，不是包含全部文案与图片的完整备份。
 
 费用以 [Supabase 当前价格](https://supabase.com/pricing) 为准。项目不会自动切到付费套餐；准备升级时由管理员检查用量、价格并决定。
+
+## 启用成员周表
+
+已有共享版项目，按顺序执行 `supabase/migrations/20261014144342_member_weekly_tables.sql` 和 `supabase/migrations/20261014144452_weekly_tables_cron.sql`。新项目要先执行原来的 `202610130001_team.sql`。已有记录会进入各自成员的周表，原始数据和封面继续保留。
+
+任务 `video-collect-weekly-tables` 每周二 16:00 UTC 执行，对应北京时间周三 00:00。可在 Supabase 的 Cron 页面查看运行记录。部署后检查 `library_weeks` 和 `member_week_tables`：每期应有四份成员表。成员加入后首次访问也会补齐其表格。
