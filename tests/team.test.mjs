@@ -7,11 +7,12 @@ test('browser fetch keeps its global receiver for login and authenticated reques
  const original=globalThis.fetch;
  globalThis.fetch=async function(url){
   assert.equal(this,globalThis,'browser fetch requires the Window receiver');
-  if(url.includes('/auth/v1/token'))return Response.json({access_token:'fixture',expires_at:Date.now()/1000+3600,user:{id:'fixture'}});
+  if(url.includes('/auth/v1/token'))return Response.json({access_token:'fixture',refresh_token:'fixture-refresh',expires_at:Date.now()/1000+3600,user:{id:'fixture'}});
   return Response.json([]);
  };
  try{
-  const c=new TeamClient({supabaseUrl:'https://fixture.supabase.co',publishableKey:'public'},{storage:{getItem:()=>null,setItem(){}}});
+  let saved=null;
+  const c=new TeamClient({supabaseUrl:'https://fixture.supabase.co',publishableKey:'public'},{storage:{getItem:()=>saved,setItem(k,v){saved=v;}}});
   await c.login('fixture@example.com','fixture-password');
   assert.equal(c.session.access_token,'fixture');
   assert.deepEqual(await c.list(),[]);

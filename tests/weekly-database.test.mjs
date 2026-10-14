@@ -9,7 +9,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
  const db=new PGlite({extensions:{pgcrypto}});
  try{
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
-   create schema auth; create table auth.users(id uuid primary key);
+   create schema auth; create table auth.users(id uuid primary key,email text);
    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
    grant usage on schema auth,public to anon,authenticated,service_role;
    grant execute on function auth.uid() to anon,authenticated,service_role;
@@ -20,7 +20,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
    create function storage.foldername(text) returns text[] language sql immutable as $$select string_to_array($1,'/')$$;`);
   await db.exec(await readFile(new URL('../supabase/migrations/202610130001_team.sql',import.meta.url),'utf8'));
   const ids=Array.from({length:5},(_,n)=>`${n+1}1111111-1111-1111-1111-111111111111`);
-  for(const id of ids)await db.query('insert into auth.users values($1)',[id]);
+  for(const id of ids)await db.query('insert into auth.users(id) values($1)',[id]);
   for(let n=0;n<4;n++)await db.query('insert into team_members values($1,$2)',[ids[n],['黄白','正源','豹朴','弈伶'][n]]);
   const as=async(role,id,sql,args=[])=>{await db.exec(`set role ${role}`);await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);try{return await db.query(sql,args);}finally{await db.exec('reset role');}};
   const old=normalizeTopic({url:'https://www.instagram.com/reel/Old123/',summary:'原有记录。'});
@@ -28,6 +28,13 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   await db.exec("update topics set created_at='2026-10-14T12:00:00Z'");
   const files=await readdir(new URL('../supabase/migrations/',import.meta.url));
   await db.exec(await readFile(new URL('../supabase/migrations/'+files.find(x=>x.endsWith('_member_weekly_tables.sql')),import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261014152055_member_identity.sql',import.meta.url),'utf8'));
+  await db.query('update auth.users set email=$1 where id=$2',['two@example.test',ids[1]]);
+  const identity=(await as('authenticated',ids[1],'select current_team_member() as member')).rows[0].member;
+  assert.deepEqual(identity,{user_id:ids[1],name:'正源',email:'two@example.test'});
+  await assert.rejects(as('anon',null,'select current_team_member()'),/permission denied/);
+  await assert.rejects(as('authenticated',ids[4],'select current_team_member()'),/未加入团队/);
+  await assert.rejects(db.query("update team_members set name='正源' where user_id=$1",[ids[0]]),/unique/);
   assert.equal((await db.query('select count(*)::int as n from member_topic_entries')).rows[0].n,1,'migration must preserve existing entries');
   assert.equal((await db.query("select name from team_members where user_id=$1",[ids[2]])).rows[0].name,'鲍朴');
   await assert.rejects(as('anon',null,'select list_weekly_topics()'),/permission denied/);

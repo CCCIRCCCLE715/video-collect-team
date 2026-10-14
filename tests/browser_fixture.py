@@ -16,7 +16,7 @@ window.fetch=async(url,o={})=>{
  const index=(o.headers?.Authorization||'').endsWith('member2')?1:0,user=members[index];
  if(path.startsWith('/auth/v1/token')){const n=body.email?.startsWith('two')?1:0;return Response.json({access_token:'member'+(n+1),refresh_token:'fixture',expires_at:Date.now()/1000+3600,user:{id:members[n].user_id}});}
  if(path==='/auth/v1/logout')return Response.json({});
- if(path.startsWith('/rest/v1/team_members'))return Response.json([user]);
+ if(path==='/rest/v1/rpc/current_team_member')return Response.json({...user,email:index?'two@example.test':'one@example.test'});
  if(path==='/rest/v1/rpc/weekly_library_state')return Response.json({current_week:current,weeks:[{start_date:current,end_date:end}],members,revision:JSON.stringify(read())});
  if(path==='/rest/v1/rpc/list_weekly_topics')return Response.json(read());
  if(path==='/rest/v1/rpc/upsert_topic'){

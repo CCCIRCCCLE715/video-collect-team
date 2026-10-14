@@ -1,4 +1,4 @@
-import {TeamClient} from './team-client.js?v=20261014-weekly';
+import {TeamClient} from './team-client.js?v=20261014-identity';
 import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel} from './weekly.js?v=20261014-weekly';
 const config=window.VIDEO_COLLECT_TEAM||{},ui=window.VideoCollectUI,$=id=>document.getElementById(id);
 const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261014-weekly';document.head.append(style);
@@ -39,7 +39,7 @@ function updateCards(){
   b.querySelector('small').textContent=member?(m.user_id===member.user_id?'我的选题':m.user_id?'查看选题':'尚未绑定账号'):'每周独立收录';});
  $('week-note').textContent='每周三 00:00 自动更新 · 北京时间 · '+(selectedWeek==='all'?'全部周表':weekLabel(selectedWeek));
 }
-function account(on){for(const id of ['team-agent','team-logout'])$(id).hidden=!on;for(const id of ['team-refresh','team-add'])$(id).disabled=!on;$('team-login').hidden=on;$('team-member').textContent=on?'当前账号：'+member.name:signedOutLabel;updateCards();}
+function account(on){for(const id of ['team-agent','team-logout'])$(id).hidden=!on;for(const id of ['team-refresh','team-add'])$(id).disabled=!on;$('team-login').hidden=on;$('team-member').textContent=on?'当前账号：'+member.name+' · '+member.email:signedOutLabel;updateCards();}
 function clear(){generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];weeks=[];members=memberOrder([]);selectedMember=null;selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
 function renderNavigation(all,current){
  const nav=$('month-nav'),focused=nav.contains(document.activeElement)?document.activeElement.dataset.period:null;nav.replaceChildren();
@@ -73,8 +73,15 @@ async function refresh(force=false){
   }catch(e){status('同步失败：'+e.message,true);if(!client.session||e.status===403){clear();await client.logout();ui.message(e.status===403?'你已不在团队成员列表中，请联系管理员。':'登录已过期，请重新登录。');}}
   finally{busy=false;}
 }
-function poll(){clearTimeout(timer);timer=setTimeout(async()=>{if(member&&!document.hidden)await refresh();if(member)poll();},Math.max(5,Number(config.pollSeconds)||5)*1000);}
-async function connect(){member=await client.member();if(member.name==='豹朴')member.name='鲍朴';selectedMember=member.user_id;selectedWeek=weekStart();selectedDate='all';account(true);await refresh(true);poll();}
+function poll(){clearTimeout(timer);timer=setTimeout(async()=>{if(!document.hidden){if(member)await refresh();else if(client.session)await restore();}if(client.session)poll();},Math.max(5,Number(config.pollSeconds)||5)*1000);}
+async function connect(){const version=generation;const identity=await client.member();if(version!==generation)return;member=identity;if(member.name==='豹朴')member.name='鲍朴';selectedMember=member.user_id;selectedWeek=weekStart();selectedDate='all';account(true);await refresh(true);poll();}
+let restoring=false;
+async function restore(){
+ if(restoring)return;restoring=true;
+ try{await connect();}
+ catch(e){status(e.message,true);clear();if(!client.session||e.status===403){await client.logout();}else{status('暂时无法连接，登录状态已保留，联网后自动重试。',true);$('team-logout').hidden=false;poll();}}
+ finally{restoring=false;}
+}
 ui.bind({
   scope:x=>!!member&&x.owner_id===selectedMember,
   periodFilter:x=>(selectedWeek==='all'||x.week_start===selectedWeek)&&(selectedDate==='all'||x.collected_on===selectedDate),
@@ -96,16 +103,16 @@ if(!config.supabaseUrl||!config.publishableKey){
   catch(e){status(e.message,true);$('team-login').disabled=true;}
   if(client){
     $('team-login').onclick=()=>{
-      const box=show('登录团队选题库','<form class="team-form"><label>邮箱<input name="email" type="email" autocomplete="username" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><small>使用管理员为你开通的账号。</small><p role="status"></p><div class="dialog-actions"><button type="submit" class="primary">登录</button><button type="button" data-close>取消</button></div></form>');
+      const box=show('登录团队选题库','<form class="team-form"><label>邮箱<input name="email" type="email" autocomplete="username" required></label><label>密码<input name="password" type="password" autocomplete="current-password" required></label><small>使用管理员为你开通的账号。登录后会自动保持，下次打开无需重复登录。</small><p role="status"></p><div class="dialog-actions"><button type="submit" class="primary">登录</button><button type="button" data-close>取消</button></div></form>');
       box.querySelector('[data-close]').onclick=close;
-      box.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在登录…';try{await client.login(f.email.value,f.password.value);await connect();f.password.value='';close();}catch(err){msg.textContent=err.message;f.password.value='';clear();await client.logout();}finally{b.disabled=false;}};
+      box.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在登录…';try{await client.login(f.email.value,f.password.value);await connect();f.password.value='';close();}catch(err){msg.textContent=err.message;f.password.value='';clear();if(!client.session||err.status===403)await client.logout();else{status('登录状态已保留，正在重试连接。',true);$('team-logout').hidden=false;poll();}}finally{b.disabled=false;}};
     };
     $('team-logout').onclick=async()=>{clear();close();status('已退出');await client.logout();};
     $('team-refresh').onclick=()=>refresh(true);
     $('team-add').onclick=()=>{
-      const box=show('新增视频选题 · '+member.name+' · '+weekLabel(currentWeek),'<form class="team-form"><label>原帖链接<input name="url" type="url" placeholder="粘贴完整视频链接" required></label><div class="form-grid"><label>标题<input name="title" maxlength="1000"></label><label>作者<input name="author" maxlength="300"></label><label>发布时间<input name="published_at" type="date"></label><label>点赞数<input name="likes" type="number" min="0"></label></div><label>一句话总结<textarea name="summary" maxlength="2000"></textarea></label><label>原帖文案<textarea name="description" maxlength="20000"></textarea></label><label>原帖封面<input name="cover" type="file" accept="image/jpeg,image/png,image/webp"></label><small>不确定的信息留空。想自动读取信息和封面，可将链接发给已配置的 Agent。</small><p role="status"></p><div class="dialog-actions"><button type="submit" class="primary">保存到我的本周表</button><button type="button" data-close>取消</button></div></form>');
+      const box=show('新增视频选题 · '+member.name+' · '+weekLabel(currentWeek),'<form class="team-form"><label>原帖链接<input name="url" type="url" placeholder="粘贴完整视频链接" required></label><div class="form-grid"><label>标题<input name="title" maxlength="1000"></label><label>作者<input name="author" maxlength="300"></label><label>发布时间<input name="published_at" type="date"></label><label>点赞数<input name="likes" type="number" min="0"></label></div><label>一句话总结<textarea name="summary" maxlength="2000"></textarea></label><label>原帖文案<textarea name="description" maxlength="20000"></textarea></label><label>原帖封面<input name="cover" type="file" accept="image/jpeg,image/png,image/webp"></label><small>内容归入当前登录账号的选题表。不确定的信息留空。想自动读取信息和封面，可将链接发给已配置的 Agent。</small><p role="status"></p><div class="dialog-actions"><button type="submit" class="primary">保存到我的本周表</button><button type="button" data-close>取消</button></div></form>');
       box.querySelector('[data-close]').onclick=close;
-      box.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在保存…';try{const input=Object.fromEntries(new FormData(f));await client.upsert(input,f.cover.files[0]||null);selectedMember=member.user_id;selectedWeek=currentWeek;selectedDate='all';await refresh(true);ui.refreshScope();close();ui.message('已保存到你的本周表。重复链接会合并；已删除的记录可在“已删除”中恢复。');}catch(err){msg.textContent=err.message;}finally{b.disabled=false;}};
+      box.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在保存…';try{const input=Object.fromEntries(new FormData(f));await client.upsert(input,f.cover.files[0]||null,member.user_id);selectedMember=member.user_id;selectedWeek=currentWeek;selectedDate='all';await refresh(true);ui.refreshScope();close();ui.message('已保存到你的本周表。重复链接会合并；已删除的记录可在“已删除”中恢复。');}catch(err){msg.textContent=err.message;}finally{b.disabled=false;}};
     };
     $('team-agent').onclick=()=>{
       const box=show('连接你的 Agent','<div class="team-form"><p class="team-help">为自己的 Agent 生成一份入库凭证。它可以新增信息和封面，不能读取选题库或删除记录。重新生成后，旧凭证立即失效。</p><button class="primary" data-mint>生成 / 重置入库凭证</button><label>入库凭证<input type="password" class="token" readonly data-token autocomplete="off" placeholder="点击生成，凭证默认隐藏"></label><button type="button" data-copy>复制凭证</button><small>将凭证保存到你本机的 .agent.env 中，不要发到群聊或提交到 GitHub。关闭此窗口后不再显示。</small><p><a href="docs/AGENT.md" target="_blank" rel="noopener">查看 Agent 接入步骤 ↗</a></p><p role="status"></p><div class="dialog-actions"><button data-revoke>撤销凭证</button><button data-close>关闭</button></div></div>');
@@ -114,7 +121,10 @@ if(!config.supabaseUrl||!config.publishableKey){
       box.querySelector('[data-mint]').onclick=async e=>{e.target.disabled=true;try{box.querySelector('[data-token]').value=await client.rpc('issue_agent_token');box.querySelector('[role=status]').textContent='已生成，旧凭证已失效。';}catch(err){box.querySelector('[role=status]').textContent=err.message;}finally{e.target.disabled=false;}};
       box.querySelector('[data-revoke]').onclick=async()=>{try{await client.rpc('revoke_agent_token');box.querySelector('[data-token]').value='';box.querySelector('[role=status]').textContent='凭证已撤销。';}catch(err){box.querySelector('[role=status]').textContent=err.message;}};
     };
-    document.addEventListener('visibilitychange',()=>{if(member&&!document.hidden)void refresh();});
-    if(client.session)connect().catch(async e=>{status(e.message,true);clear();await client.logout();});
+    const resume=()=>{client.syncSession();if(client.session){if(member)void refresh();else void restore();}else if(member)clear();};
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)resume();});
+    window.addEventListener('online',resume);
+    window.addEventListener('storage',e=>{if(e.key!==client.storageKey)return;const previous=client.session?.user?.id;client.syncSession();if(previous!==client.session?.user?.id){close();clear();if(client.session)void restore();else status('已退出');}});
+    if(client.session)void restore();
   }
 }
