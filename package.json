@@ -1,0 +1,1 @@
+{"name":"video-collect-team","private":true,"type":"module","scripts":{"test":"node --test tests/team.test.mjs tests/database.test.mjs && node tests/library.cjs && python3 -m unittest discover -s tests -p 'test_*.py'"},"devDependencies":{"@electric-sql/pglite":"0.5.9"}}

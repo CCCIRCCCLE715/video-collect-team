@@ -1,0 +1,12 @@
+/site/
+/data/
+.agent.env
+.env
+.env.*
+!.env.example
+/node_modules/
+/dist/
+__pycache__/
+*.pyc
+.DS_Store
+/supabase/.temp/
