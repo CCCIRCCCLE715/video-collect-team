@@ -5,7 +5,7 @@
 ## 配置一次
 
 1. 下载整个项目，在自己的 Agent 中打开这个项目目录，让它读取仓库 `AGENTS.md`。
-2. 登录团队网站，打开“Agent 入库”，点击“生成 / 重置入库凭证”。
+2. 登录[团队网站](https://cccircccle715.github.io/video-collect-team/)，打开“Agent 入库”，点击“生成 / 重置入库凭证”。
 3. 将 `.agent.env.example` 复制为 `.agent.env`，在本机填写项目 URL 和个人凭证。这个文件已加入 Git 忽略规则，不要把内容发到聊天或提交到仓库。
 
 ```dotenv
