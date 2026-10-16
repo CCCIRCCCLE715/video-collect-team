@@ -15,3 +15,17 @@ export function memberOrder(members){
  return MEMBER_NAMES.map(name=>rows.find(m=>m.name===name)||{name,user_id:null});
 }
 export function weekLabel(start,end=weekEnd(start)){return start+' 至 '+end;}
+
+// Archive month is the month assigned by the source library, not import time.
+export function topicMonth(row){
+ if(/^\d{4}-(0[1-9]|1[0-2])$/.test(row.month||''))return row.month;
+ if(row.captured_at&&Number.isFinite(Date.parse(row.captured_at)))return shanghaiDate(row.captured_at).slice(0,7);
+ return '未标月份';
+}
+export function monthList(rows){
+ return [...new Set(rows.map(topicMonth))].sort((a,b)=>a==='未标月份'?1:b==='未标月份'?-1:b.localeCompare(a));
+}
+export function matchesPeriod(row,{mode='month',month='all',week='all',date='all'}={}){
+ return mode==='month'?(month==='all'||topicMonth(row)===month):
+  (week==='all'||row.week_start===week)&&(date==='all'||row.collected_on===date);
+}
