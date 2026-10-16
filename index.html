@@ -199,7 +199,7 @@ table{table-layout:fixed}.cover-column{width:10%}.title-column{width:20%}.platfo
 <section class="search-panel" role="search"><label for="search">关键词搜索</label><div class="search-row"><input id="search" type="search" placeholder="搜索标题、文案或总结" autocomplete="off"><button id="clear-search" type="button">清空</button></div><small>搜索标题、文案、总结或作者；多个词用空格隔开。</small></section>
 <nav class="filters" id="platform-filters" aria-label="平台筛选"></nav>
 <div class="toolbar"><button id="sync-candidates" class="sync-button" type="button">同步候选（0）</button><span id="sync-feedback" role="status"></span><label class="low-filter"><input id="sequence-preload" type="checkbox" checked>顺序预加载后5条</label><small id="preload-info">本地视频预加载已开启；原帖需启用浏览器小助手</small><select id="kind" aria-label="类型"><option value="all">全部类型</option><option value="媒体">媒体</option><option value="选题">选题</option><option value="参考链接">参考链接</option><option value="文档">文档</option><option value="排期">排期</option></select><select id="media" aria-label="离线状态"><option value="all">全部内容</option><option value="downloaded">离线视频</option><option value="images">离线图文</option><option value="link">仅链接</option></select><select id="sort" aria-label="排序"><option value="captured">最近收录</option><option value="likes">月份内按点赞数</option><option value="order">月份内按归档顺序</option></select><span class="result" id="result"></span></div>
-<div class="table-wrap"><table><thead><tr><th class="select-cell"><input id="select-all" type="checkbox" aria-label="全选当前筛选结果" title="全选当前筛选结果，含尚未展开的条目"></th><th class="cover-column">封面</th><th class="title-column">标题 / 作者</th><th class="platform-column">平台</th><th class="summary-column">一句话总结</th><th class="metric-column">点赞</th><th class="metric-column">浏览量</th><th class="date-column">发布时间</th><th class="status-column">状态</th><th class="actions-column">原帖</th></tr></thead><tbody id="rows"></tbody></table><div class="empty" id="empty" hidden>没有符合条件的内容</div></div><div class="more-wrap" id="more-wrap" hidden><button id="show-more" type="button">继续显示</button></div>
+<div class="table-wrap"><table><thead><tr><th class="select-cell"><input id="select-all" type="checkbox" aria-label="全选当前筛选结果" title="全选当前筛选结果，含尚未展开的条目"></th><th id="favorite-heading" class="favorite-column" hidden>收藏</th><th class="cover-column">封面</th><th class="title-column">标题 / 作者</th><th class="platform-column">平台</th><th class="summary-column">一句话总结</th><th class="metric-column">点赞</th><th class="metric-column">浏览量</th><th class="date-column">发布时间</th><th class="status-column">状态</th><th class="actions-column">原帖</th></tr></thead><tbody id="rows"></tbody></table><div class="empty" id="empty" hidden>没有符合条件的内容</div></div><div class="more-wrap" id="more-wrap" hidden><button id="show-more" type="button">继续显示</button></div>
 <details class="library-notes"><summary>资料说明</summary><p>点击封面可放大预览，也可上传自己的封面图片。已保存的视频可点击“播放”打开；“打开”会跳转到原帖。删除的选题可在“已删除”中恢复，删除状态和上传的封面保存在当前浏览器。抓取时间不是点赞或收藏时间。导出会包含全部筛选结果，已删除的选题不会导出。导出文件不包含视频、正文和本机文件路径，但原帖链接可能带访问参数，请仅分享给有权限的同事。</p></details>
 </section></div></main>
 
@@ -210,7 +210,7 @@ table{table-layout:fixed}.cover-column{width:10%}.title-column{width:20%}.platfo
 <dialog id="cover-preview" class="manage-dialog" aria-labelledby="cover-heading"><h2 id="cover-heading">封面预览</h2><p id="cover-title"></p><div class="cover-stage"><img id="cover-image" alt="视频封面" hidden><p id="cover-missing">尚未保存这条视频的封面。</p></div><label class="cover-upload">添加或替换封面图片（保存在当前浏览器）<input id="cover-file" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="cover-feedback" role="status"></p><div class="dialog-actions"><a id="cover-source" class="source-button" target="_blank" rel="noopener noreferrer">打开原帖 ↗</a><button id="cover-close" type="button">关闭</button></div></dialog>
 <script id="catalog" type="application/json">[]</script>
 <script src="team-config.js" data-team-only></script>
-<script type="module" src="assets/team-ui.js?v=20261014-identity" data-team-only></script>
+<script type="module" src="assets/team-ui.js?v=20261016-favorites" data-team-only></script>
 <script>
 const items=JSON.parse(document.getElementById('catalog').textContent),byId=id=>document.getElementById(id),viewer=byId('viewer'),photo=byId('photo');let video=byId('video');
 let platform='all',visible=[],viewable=[],index=-1,photoIndex=0,wheel=0,wheelLocked=false,wheelTimer;
@@ -226,7 +226,7 @@ let deletedIds=new Set(),coverOverrides={},pendingDelete=null,coverItem=null;
 let teamAdapter=null;
 try{const value=JSON.parse(localStorage.getItem(deletedKey)||'[]');if(Array.isArray(value))deletedIds=new Set(value.filter(v=>typeof v==='string'))}catch{byId('library-feedback').textContent='无法读取删除记录，请检查浏览器的本地存储设置。'}
 try{const value=JSON.parse(localStorage.getItem(coverKey)||'{}');if(value&&typeof value==='object'&&!Array.isArray(value))coverOverrides=value}catch{}
-const scopedItems=()=>items.filter(x=>!teamAdapter?.scope||teamAdapter.scope(x));
+const scopedItems=()=>teamAdapter?.selectItems?teamAdapter.selectItems(items):items.filter(x=>!teamAdapter?.scope||teamAdapter.scope(x));
 const activeItems=()=>scopedItems().filter(x=>!deletedIds.has(x.id));
 const periodMatches=x=>teamAdapter?.periodFilter?teamAdapter.periodFilter(x):(month==='all'||x.month===month);
 const rowGroup=x=>teamAdapter?.groupKey?teamAdapter.groupKey(x):(x.month||'未标月份');
@@ -359,8 +359,15 @@ function render(reset=true){
   viewable=visible.filter(x=>x.status!=='link');
   const tbody=byId('rows');tbody.replaceChildren();let lastMonth='';
   visible.slice(0,displayLimit).forEach((x,i)=>{
-    if(rowGroup(x)!==lastMonth){const heading=el('tr',undefined,'month-divider'),cell=el('td');cell.colSpan=10;cell.append(document.createTextNode(rowGroup(x)),el('small',`${number(visible.filter(v=>rowGroup(v)===rowGroup(x)).length)} 条`));heading.append(cell);tbody.append(heading);lastMonth=rowGroup(x)}
+    if(rowGroup(x)!==lastMonth){const heading=el('tr',undefined,'month-divider'),cell=el('td');cell.colSpan=teamAdapter?.setFavorite?11:10;cell.append(document.createTextNode(rowGroup(x)),el('small',`${number(visible.filter(v=>rowGroup(v)===rowGroup(x)).length)} 条`));heading.append(cell);tbody.append(heading);lastMonth=rowGroup(x)}
     const tr=el('tr'),pick=el('td',undefined,'select-cell'),check=el('input');check.type='checkbox';check.className='row-select';check.value=x.id;check.checked=selectedSync.has(x.id);check.disabled=syncBusy||!selectableSync(x);check.setAttribute('aria-label',`选择：${x.title}`);check.title=selectableSync(x)?'加入批量选择':'本月已同步';check.onchange=()=>{if(check.checked)selectedSync.add(x.id);else selectedSync.delete(x.id);updateBulk()};pick.append(check);tr.append(pick);
+    if(teamAdapter?.setFavorite){
+      const liked=teamAdapter.isFavorite(x),cell=el('td',undefined,'favorite-cell'),heart=el('button',liked?'★':'☆','favorite-button');
+      heart.type='button';heart.setAttribute('aria-pressed',String(liked));heart.setAttribute('aria-label',(liked?'取消收藏：':'收藏：')+(x.title||'未命名'));heart.title=(liked?'取消收藏 · ':'收藏到 ')+(teamAdapter.favoriteTarget?.()||'当前成员')+'的收藏库';
+      heart.disabled=!!teamAdapter.favoriteBusy?.(x);
+      heart.onclick=async()=>{heart.disabled=true;try{await teamAdapter.setFavorite(x,!liked);}catch(e){byId('library-feedback').textContent='收藏未保存：'+e.message;}finally{heart.disabled=false;}};
+      cell.append(heart);tr.append(cell);
+    }
     const mediaCell=el('td',undefined,'media-cell'),button=el('button',undefined,'thumb '+(x.status==='downloaded'?'play':x.status==='images'?'images':'link'));
     button.type='button';button.title='预览封面：'+(x.title||'未命名');
     const poster=posterFor(x);if(poster){const img=el('img');img.loading='lazy';img.alt=(x.title||'视频')+'的封面';img.src=poster;img.onerror=()=>button.replaceChildren(document.createTextNode('封面未加载'));button.append(img)}else button.textContent='添加封面';
@@ -383,9 +390,10 @@ function shareRows(){return visible.map(x=>({title:x.title,summary:x.summary||''
 byId('export-share').onclick=()=>{if(!visible.length)return;const blob=new Blob([JSON.stringify(shareRows(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=el('a');a.href=url;a.download='topics-'+(month==='all'?'all':month)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 ['search','kind','media','sort'].forEach(id=>byId(id).addEventListener(id==='search'?'input':'change',()=>render()));byId('clear-search').onclick=()=>{byId('search').value='';render();byId('search').focus()};byId('show-more').onclick=()=>{displayLimit+=80;render(false)};byId('clear-filters').onclick=()=>{teamAdapter?.clearFilters?.();month='all';platform='all';byId('search').value='';for(const id of ['kind','media'])byId(id).value='all';byId('sort').value='captured';render()};render();
 window.VideoCollectUI={
-  bind(adapter){teamAdapter=adapter;coverOverrides={};deletedIds=new Set();},
+  bind(adapter){teamAdapter=adapter;coverOverrides={};deletedIds=new Set();byId('favorite-heading').hidden=!adapter?.setFavorite;},
   replaceCatalog(rows){items.splice(0,items.length,...rows);months.splice(0,months.length,...[...new Set(items.map(x=>x.month||'未标月份'))].sort((a,b)=>b.localeCompare(a)));deletedIds=new Set(items.filter(x=>x.deleted_at).map(x=>x.id));searchIndex.clear();for(const x of items)searchIndex.set(x.id,normalizeSearch([x.title,x.description,x.summary,x.author,x.month,x.kind,(x.contributors||[]).join(' ')].join(' ')));render(false);if(byId('trash-dialog').open)renderTrash();if(coverItem&&byId('cover-preview').open){const row=items.find(x=>x.id===coverItem.id);if(row){coverItem=row;const poster=posterFor(row);byId('cover-image').hidden=!poster;byId('cover-missing').hidden=!!poster;if(poster)byId('cover-image').src=poster;}}},
   refreshScope(){platform='all';month='all';pendingDelete=null;byId('delete-dialog').close();byId('cover-preview').close();coverItem=null;render();if(byId('trash-dialog').open)renderTrash();},
+  refreshView(){render(false);},
   message(value){byId('library-feedback').textContent=value;}
 };
 </script></body></html>

@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 script = r'''
 window.VIDEO_COLLECT_TEAM={supabaseUrl:'https://fixture.supabase.co',publishableKey:'sb_publishable_fixture',teamName:'周表功能测试（模拟云端）',pollSeconds:5};
 const originalFetch=window.fetch.bind(window),store='video-collect-weekly-fixture-v1';
-const members=['黄白','正源','鲍朴','弈伶'].map((name,n)=>({name,user_id:String(n+1).repeat(8)+'-1111-1111-1111-111111111111'}));
+const members=['黄白','正源','豹朴','奕伶'].map((name,n)=>({name,user_id:String(n+1).repeat(8)+'-1111-1111-1111-111111111111'}));
 const current='2026-10-14',end='2026-10-20';
 const base={title:'AI 生成电影镜头的制作流程',author:'示例作者',summary:'演示用 AI 制作电影镜头的流程。',description:'这是用于检查界面的模拟选题。',url:'https://www.instagram.com/reel/Fixture123/',platform:'instagram',platform_label:'Instagram',origins:['import'],status:'link',kind:'媒体',images:[],published_at:'2026-10-13',likes:42,month:'2026-10',deleted_at:null,cover_path:'fixture.png',week_start:current,week_end:end,collected_on:current,captured_at:current+'T03:00:00Z'};
 const seed=members.slice(0,2).map((m,n)=>({...base,id:'fixture-entry-'+n,topic_id:'instagram:Fixture123',owner_id:m.user_id,owner_name:m.name,contributors:[m.name],title:n?'AI 电影片段的剪辑方法':base.title}));
@@ -17,6 +17,14 @@ window.fetch=async(url,o={})=>{
  if(path.startsWith('/auth/v1/token')){const n=body.email?.startsWith('two')?1:0;return Response.json({access_token:'member'+(n+1),refresh_token:'fixture',expires_at:Date.now()/1000+3600,user:{id:members[n].user_id}});}
  if(path==='/auth/v1/logout')return Response.json({});
  if(path==='/rest/v1/rpc/current_team_member')return Response.json({...user,email:index?'two@example.test':'one@example.test'});
+ const allFavorites=JSON.parse(localStorage.getItem(store+'-favorites')||'{}'),mine=allFavorites[user.user_id]||[];
+ if(path.startsWith('/rest/v1/topic_favorites?'))return Response.json(Object.values(allFavorites).flat());
+ if(path==='/rest/v1/rpc/set_topic_favorite'){
+  const target=body.p_member_id||user.user_id,collection=allFavorites[target]||[];
+  const row=read().find(x=>x.id===body.p_entry_id);if(!row)return Response.json({message:'这条选题不存在'},{status:400});
+  allFavorites[target]=body.p_favorite?(collection.some(f=>f.topic_id===row.topic_id)?collection:[{user_id:target,topic_id:row.topic_id,entry_id:row.id,created_at:new Date().toISOString()},...collection]):collection.filter(f=>f.topic_id!==row.topic_id);
+  localStorage.setItem(store+'-favorites',JSON.stringify(allFavorites));return Response.json(null);
+ }
  if(path==='/rest/v1/rpc/weekly_library_state')return Response.json({current_week:current,weeks:[{start_date:current,end_date:end}],members,revision:JSON.stringify(read())});
  if(path==='/rest/v1/rpc/list_weekly_topics')return Response.json(read());
  if(path==='/rest/v1/rpc/upsert_topic'){

@@ -15,5 +15,5 @@ test('Beijing Wednesday midnight starts a new collection even on a Tuesday UTC c
 });
 test('member cards preserve the requested order while accepting the old member spelling',()=>{
  const members=[{name:'弈伶'},{name:'豹朴'},{name:'黄白'},{name:'正源'}];
- assert.deepEqual(memberOrder(members).map(m=>m.name),['黄白','正源','鲍朴','弈伶']);
+ assert.deepEqual(memberOrder(members).map(m=>m.name),['黄白','正源','豹朴','奕伶']);
 });

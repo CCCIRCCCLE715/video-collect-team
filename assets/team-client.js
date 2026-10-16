@@ -79,6 +79,8 @@ export class TeamClient {
     const items=await this.rpc('list_topics');
     await Promise.all(items.map(async x=>{x.poster=null;if(x.cover_path)try{x.poster=await this.signedCover(x.cover_path);}catch{x.cover_error=true;}}));return items;
   }
+  favorites(){return this.request('/rest/v1/topic_favorites?select=user_id,topic_id,entry_id,created_at&order=created_at.desc,topic_id.asc');}
+  setFavorite(id,value,memberId,expectedUserId){return this.request('/rest/v1/rpc/set_topic_favorite',{method:'POST',body:{p_entry_id:id,p_favorite:value,p_member_id:memberId},expectedUserId});}
   weeklyState(){return this.rpc('weekly_library_state');}
   async listWeekly(){
     const items=await this.rpc('list_weekly_topics');
