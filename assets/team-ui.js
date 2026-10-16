@@ -1,24 +1,24 @@
-import {favoriteRows} from './favorites.js?v=20261016-favorites';
-import {TeamClient} from './team-client.js?v=20261016-favorites';
-import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel} from './weekly.js?v=20261016-favorites';
+import {favoriteRows} from './favorites.js?v=20261016-original-months';
+import {TeamClient} from './team-client.js?v=20261016-original-months';
+import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel,topicMonth,monthList,matchesPeriod} from './weekly.js?v=20261016-original-months';
 const config=window.VIDEO_COLLECT_TEAM||{},ui=window.VideoCollectUI,$=id=>document.getElementById(id);
-const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261016-favorites';document.head.append(style);
+const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261016-original-months';document.head.append(style);
 const bar=document.createElement('section');bar.className='team-bar';bar.setAttribute('aria-label','团队账号');
 bar.innerHTML='<div class="member-cards" id="member-cards" aria-label="成员选题库"></div><div class="team-toolbar"><button id="team-add" class="primary" disabled>新增选题</button><button id="team-refresh" disabled>刷新</button><div class="team-info"><small id="team-member">请登录团队账号</small></div><span id="team-status" class="team-status" role="status"></span><button id="team-agent" hidden>Agent 入库</button><button id="team-login">登录</button><button id="team-logout" hidden>退出</button></div><p id="week-note" class="week-note"></p>';
 document.querySelector('.workspace').before(bar);
 const signedOutLabel='请登录团队账号';
 $('team-member').textContent=signedOutLabel;
-document.querySelector('.intro').textContent='按成员、平台和日期整理视频选题。每周三开启新一周，往期内容随时可查。';
+document.querySelector('.intro').textContent='按成员、原月份和平台整理视频选题。历史资料保留原有月份，也可切换周表查看收录记录。';
 document.querySelector('.console-status').textContent='TEAM LIBRARY';
 document.querySelector('.month-panel').setAttribute('aria-label','日期导航');
-document.querySelector('.month-panel h2').textContent='周表与日期';
-$('month-nav').setAttribute('aria-label','按周表和收录日期浏览');
+document.querySelector('.month-panel h2').textContent='月份与周表';
+$('month-nav').setAttribute('aria-label','按原月份或周表浏览');
 const favoritesPanel=document.createElement('section');favoritesPanel.className='favorites-panel';favoritesPanel.innerHTML='<h2>收藏库</h2><button id="my-favorites" class="month-option" aria-pressed="false" disabled><span>☆ 收藏库</span><small>0</small></button><p>星星收藏到上方选中的成员，团队共同维护。</p>';document.querySelector('.month-panel').append(favoritesPanel);
-document.querySelector('.month-hint').textContent='按北京时间的收录日期归档。每周三至下周二为一张表，往期内容保留。';
-$('sort').options[1].textContent='日期内按点赞数';$('sort').options[2].textContent='日期内按归档顺序';
+document.querySelector('.month-hint').textContent='月份沿用资料原有分类；没有指定月份时，采用首次收录月份。周表按实际收录时间查看。';
+$('sort').options[1].textContent='分类内按点赞数';$('sort').options[2].textContent='分类内按归档顺序';
 document.title=(config.teamName||'团队选题库')+' · 选题中台';
-document.querySelector('.scope-note').textContent='选择成员后查看其周表。每周三 00:00（北京时间）自动创建四份新表，成员更新会自动同步。';
-document.querySelector('.library-notes p').textContent='点击封面可放大预览。选题按收录日期归入当周，同一成员在同一周重复收录会合并。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。播放请打开原帖。';
+document.querySelector('.scope-note').textContent='选择成员后按原月份浏览资料；切换周表可查看每次收录记录。成员更新会自动同步。';
+document.querySelector('.library-notes p').textContent='点击封面可放大预览。历史资料按原有月份展示；实际收录时间仍保留在周表中。同一成员在同一周重复收录会合并。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。播放请打开原帖。';
 $('delete-title').nextElementSibling.textContent='这条选题会从你的这份周表中隐藏，可在“已删除”中恢复。其他成员和其他周的记录会保留，原平台的视频也不受影响。';
 document.querySelector('.cover-upload').firstChild.textContent='添加或替换这条选题的封面（最大 2 MB）';
 const dialog=document.createElement('dialog');dialog.className='manage-dialog';document.body.append(dialog);
@@ -28,6 +28,9 @@ dialog.addEventListener('cancel',()=>{dialog.replaceChildren();});
 function status(text,error=false){$('team-status').textContent=text;$('team-status').classList.toggle('error',error);}
 let client=null,member=null,busy=false,timer=null,signature='',revision='',generation=0;
 let favorites=[],favoriteMode=false,favoriteEpoch=0;const favoritePending=new Set();
+let periodMode='month',selectedMonth='all';
+const periodMatches=x=>matchesPeriod(x,{mode:periodMode,month:selectedMonth,week:selectedWeek,date:selectedDate});
+const periodTitle=()=>periodMode==='month'?(selectedMonth==='all'?'全部月份':selectedMonth):(selectedWeek==='all'?'全部日期':selectedDate==='all'?weekLabel(selectedWeek):selectedDate);
 let members=memberOrder([]),catalog=[],weeks=[],selectedMember=null,selectedWeek=weekStart(),selectedDate='all',currentWeek=selectedWeek;
 const cardButtons=MEMBER_NAMES.map((name,index)=>{
  const b=document.createElement('button');b.type='button';b.className='member-card';b.innerHTML='<strong></strong><span></span><small></small>';
@@ -38,26 +41,33 @@ const cardButtons=MEMBER_NAMES.map((name,index)=>{
 function updateCards(){
  members=memberOrder(members);
  cardButtons.forEach((b,i)=>{const m=members[i];b.disabled=!member||!m.user_id;b.setAttribute('aria-pressed',selectedMember===m.user_id&&!!member?'true':'false');
-  b.querySelector('span').textContent=member?(favoriteMode?favoriteRows(catalog,favorites,m.user_id).length+' 条收藏':catalog.filter(x=>x.owner_id===m.user_id&&(selectedWeek==='all'||x.week_start===selectedWeek)&&!x.deleted_at).length+' 条选题'):'登录后查看';
+  b.querySelector('span').textContent=member?(favoriteMode?favoriteRows(catalog,favorites,m.user_id).length+' 条收藏':catalog.filter(x=>x.owner_id===m.user_id&&periodMatches(x)&&!x.deleted_at).length+' 条选题'):'登录后查看';
   b.querySelector('small').textContent=member?(m.user_id===member.user_id?(favoriteMode?'我的收藏':'我的选题'):m.user_id?(favoriteMode?'查看收藏':'查看选题'):'尚未绑定账号'):'每周独立收录';});
  $('my-favorites').disabled=!member;$('my-favorites').setAttribute('aria-pressed',String(favoriteMode));$('my-favorites').querySelector('small').textContent=member?favoriteRows(catalog,favorites,selectedMember).length:0;
- $('week-note').textContent=favoriteMode?'收藏库 · 团队共同维护 · 跨周保留':'每周三 00:00 自动更新 · 北京时间 · '+(selectedWeek==='all'?'全部周表':weekLabel(selectedWeek));
+ $('week-note').textContent=favoriteMode?'收藏库 · 团队共同维护 · 跨周保留':periodMode==='month'?'按资料原月份归档 · '+periodTitle():'每周三 00:00 自动更新 · 北京时间 · '+(selectedWeek==='all'?'全部周表':weekLabel(selectedWeek));
 }
 $('my-favorites').onclick=()=>{if(!member)return;favoriteMode=true;updateCards();ui.refreshScope();};
 function account(on){for(const id of ['team-agent','team-logout'])$(id).hidden=!on;for(const id of ['team-refresh','team-add'])$(id).disabled=!on;$('team-login').hidden=on;$('team-member').textContent=on?'当前账号：'+member.name+' · '+member.email:signedOutLabel;updateCards();}
-function clear(){generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];favorites=[];favoriteMode=false;favoritePending.clear();weeks=[];members=memberOrder([]);selectedMember=null;selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
+function clear(){generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];favorites=[];favoriteMode=false;favoritePending.clear();weeks=[];members=memberOrder([]);selectedMember=null;periodMode='month';selectedMonth='all';selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
 function renderNavigation(all,current){
  const nav=$('month-nav'),focused=nav.contains(document.activeElement)?document.activeElement.dataset.period:null;nav.replaceChildren();
  const name=members.find(m=>m.user_id===selectedMember)?.name||'成员';
- $('current-heading').textContent=member?(favoriteMode?name+' · 收藏库':name+' · '+(selectedWeek==='all'?'全部日期':selectedDate==='all'?weekLabel(selectedWeek):selectedDate)):'每周选题表';
- $('current-description').textContent=member?(favoriteMode?'已收藏 '+current.length+' 条 · 跨周保留 · '+'团队成员均可添加或取消收藏':'收录 '+current.length+' 条 · 按平台查看 · '+(selectedMember===member.user_id?'可维护自己的选题':'正在查看其他成员的选题')):'登录后查看成员选题和历史周表';
+ $('current-heading').textContent=member?(favoriteMode?name+' · 收藏库':name+' · '+periodTitle()):'成员选题库';
+ $('current-description').textContent=member?(favoriteMode?'已收藏 '+current.length+' 条 · 跨周保留 · '+'团队成员均可添加或取消收藏':'收录 '+current.length+' 条 · 按平台查看 · '+(selectedMember===member.user_id?'可维护自己的选题':'正在查看其他成员的选题')):'登录后按原月份查看成员选题';
  if(favoriteMode)all=catalog.filter(x=>x.owner_id===selectedMember&&!x.deleted_at);
+ const modes=document.createElement('div');modes.className='period-modes';modes.setAttribute('aria-label','归档方式');
+ for(const [mode,label] of [['month','按月份'],['week','按周表']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.period='mode-'+mode;b.setAttribute('aria-pressed',String(periodMode===mode));b.onclick=()=>{favoriteMode=false;periodMode=mode;selectedDate='all';updateCards();ui.refreshScope();};modes.append(b);}nav.append(modes);
  const add=(label,value,count,active,action,cls='')=>{const b=document.createElement('button');b.type='button';b.className='month-option '+cls+(active?' active':'');b.setAttribute('aria-pressed',String(active));b.dataset.period=value;const span=document.createElement('span');span.textContent=label;const small=document.createElement('small');small.textContent=count;b.append(span,small);b.onclick=()=>{favoriteMode=false;updateCards();action();};nav.append(b);};
+ if(periodMode==='month'){
+  add('全部月份','all',all.length,!favoriteMode&&selectedMonth==='all',()=>{selectedMonth='all';updateCards();ui.refreshScope();});
+  for(const value of monthList(all))add(value,value,all.filter(x=>topicMonth(x)===value).length,!favoriteMode&&selectedMonth===value,()=>{selectedMonth=value;updateCards();ui.refreshScope();});
+ }else{
  add('全部日期','all',all.length,!favoriteMode&&selectedWeek==='all',()=>{selectedWeek='all';selectedDate='all';updateCards();ui.refreshScope();});
  for(const w of weeks){
   const rows=all.filter(x=>x.week_start===w.start_date);
   add(weekLabel(w.start_date,w.end_date)+(w.start_date===currentWeek?' · 本周':''),w.start_date,rows.length,!favoriteMode&&selectedWeek===w.start_date&&selectedDate==='all',()=>{selectedWeek=w.start_date;selectedDate='all';updateCards();ui.refreshScope();},'week-option');
-  if(w.start_date===selectedWeek)for(const d of weekDates(w.start_date))add(d,d,rows.filter(x=>x.collected_on===d).length,!favoriteMode&&selectedDate===d,()=>{selectedDate=d;ui.refreshScope();},'day-option');
+  if(w.start_date===selectedWeek)for(const d of weekDates(w.start_date))add(d,d,rows.filter(x=>x.collected_on===d).length,!favoriteMode&&selectedDate===d,()=>{selectedDate=d;updateCards();ui.refreshScope();},'day-option');
+ }
  }
  if(focused)Array.from(nav.querySelectorAll('button')).find(b=>b.dataset.period===focused)?.focus();
 }
@@ -67,7 +77,7 @@ async function refresh(force=false){
     const [state,savedFavorites]=await Promise.all([client.weeklyState(),client.favorites()]);if(version!==generation||favoriteVersion!==favoriteEpoch)return;
     const previous=currentWeek;currentWeek=state.current_week;weeks=state.weeks;members=memberOrder(state.members);if(member){const current=members.find(m=>m.user_id===member.user_id);if(current){member.name=current.name;account(true);}}
     if(!selectedMember)selectedMember=member.user_id;
-    if(previous!==currentWeek&&selectedWeek===previous){selectedWeek=currentWeek;selectedDate='all';}
+    if(periodMode==='week'&&previous!==currentWeek&&selectedWeek===previous){selectedWeek=currentWeek;selectedDate='all';}
     const currentRevision=state.revision+JSON.stringify(savedFavorites);favorites=savedFavorites;
     if(!force&&revision===currentRevision&&!client.coversExpiring()){status('已同步 · '+new Date().toLocaleTimeString('zh-CN',{hour12:false}));return;}
     const rows=await client.listWeekly();if(version!==generation||favoriteVersion!==favoriteEpoch)return;
@@ -75,12 +85,12 @@ async function refresh(force=false){
     catalog=rows;updateCards();if(force||next!==signature||revision!==currentRevision){ui.replaceCatalog(rows);signature=next;}
     revision=rows.some(x=>x.cover_error)?'':currentRevision;
     status(rows.some(x=>x.cover_error)?'部分封面暂时无法加载，稍后会重试':'已同步 · '+new Date().toLocaleTimeString('zh-CN',{hour12:false}));
-    if(!$('rows').children.length)$('empty').textContent=favoriteMode?'还没有收藏的视频。点击封面左侧的星星即可收藏。':'当前成员在所选日期还没有选题。新增内容会保存到当前账号的本周表。';
+    if(!$('rows').children.length)$('empty').textContent=favoriteMode?'还没有收藏的视频。点击封面左侧的星星即可收藏。':'当前成员在所选月份或日期还没有选题。可切换月份或周表查看。';
   }catch(e){status('同步失败：'+e.message,true);if(!client.session||e.status===403){clear();await client.logout();ui.message(e.status===403?'你已不在团队成员列表中，请联系管理员。':'登录已过期，请重新登录。');}}
   finally{busy=false;}
 }
 function poll(){clearTimeout(timer);timer=setTimeout(async()=>{if(!document.hidden){if(member)await refresh();else if(client.session)await restore();}if(client.session)poll();},Math.max(5,Number(config.pollSeconds)||5)*1000);}
-async function connect(){const version=generation;const identity=await client.member();if(version!==generation)return;member=identity;if(member.name==='鲍朴')member.name='豹朴';if(member.name==='弈伶')member.name='奕伶';selectedMember=member.user_id;selectedWeek=weekStart();selectedDate='all';account(true);await refresh(true);poll();}
+async function connect(){const version=generation;const identity=await client.member();if(version!==generation)return;member=identity;if(member.name==='鲍朴')member.name='豹朴';if(member.name==='弈伶')member.name='奕伶';selectedMember=member.user_id;periodMode='month';selectedMonth='all';selectedWeek=weekStart();selectedDate='all';account(true);await refresh(true);poll();}
 let restoring=false;
 async function restore(){
  if(restoring)return;restoring=true;
@@ -98,10 +108,10 @@ ui.bind({
     try{await client.setFavorite(x.id,value,selectedMember,owner);const next=await client.favorites();if(version!==generation)return;favoriteEpoch++;favorites=next;revision='';updateCards();ui.refreshView();ui.message(value?'已加入收藏库。':'已取消收藏。');}
     finally{if(version===generation){favoritePending.delete(x.topic_id);ui.refreshView();}}
   },
-  periodFilter:x=>favoriteMode||((selectedWeek==='all'||x.week_start===selectedWeek)&&(selectedDate==='all'||x.collected_on===selectedDate)),
-  groupKey:x=>x.collected_on,
+  periodFilter:x=>favoriteMode||periodMatches(x),
+  groupKey:x=>periodMode==='month'?topicMonth(x):x.collected_on,
   platforms:['xiaohongshu','douyin','instagram'],renderNavigation,
-  clearFilters(){selectedWeek=currentWeek;selectedDate='all';updateCards();},
+  clearFilters(){selectedMonth='all';selectedWeek=currentWeek;selectedDate='all';updateCards();},
   canEdit:x=>!!member&&x.owner_id===member.user_id,
   async setDeleted(id,value){await client.setEntryDeleted(id,value);await refresh(true);},
   async replaceCover(row,file){await client.replaceEntryCover(row.id,file);await refresh(true);}

@@ -36,6 +36,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   await assert.rejects(as('authenticated',ids[4],'select current_team_member()'),/未加入团队/);
   await assert.rejects(db.query("update team_members set name='正源' where user_id=$1",[ids[0]]),/unique/);
   await db.exec(await readFile(new URL('../supabase/migrations/'+files.find(x=>x.endsWith('_personal_favorites.sql')),import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/'+files.find(x=>x.endsWith('_preserve_original_months.sql')),import.meta.url),'utf8'));
   assert.equal((await as('authenticated',ids[2],'select current_team_member() as member')).rows[0].member.name,'豹朴');
   assert.equal((await as('authenticated',ids[3],'select current_team_member() as member')).rows[0].member.name,'奕伶');
   assert.equal((await db.query('select count(*)::int as n from member_topic_entries')).rows[0].n,1,'migration must preserve existing entries');
@@ -46,7 +47,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   for(const [at,want] of [['2026-10-13T15:59:59Z','2026-10-07'],['2026-10-13T16:00:00Z','2026-10-14'],['2026-10-20T15:59:59Z','2026-10-14'],['2026-10-20T16:00:00Z','2026-10-21']]){
    assert.equal((await db.query('select app_private.collection_week($1)::text as week',[at])).rows[0].week,want);
   }
-  const topic={...normalizeTopic({url:'https://www.instagram.com/reel/Weekly123/',summary:'第一周的总结。'}),owner_id:ids[3],week_start:'2099-01-01'};
+  const topic={...normalizeTopic({url:'https://www.instagram.com/reel/Weekly123/',summary:'第一周的总结。',month:'2026-08'}),owner_id:ids[3],week_start:'2099-01-01'};
   const capture=async(member,at,input=topic)=>(await db.query('select app_private.capture_topic($1,$2::jsonb,null,$3) as id',[member,JSON.stringify(input),at])).rows[0].id;
   const first=await capture(ids[0],'2026-10-14T02:00:00Z');
   assert.equal(await capture(ids[0],'2026-10-20T15:59:59Z'),first);
@@ -56,6 +57,8 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   assert.notEqual(next,first);
   const entries=(await as('authenticated',ids[1],'select list_weekly_topics() as rows')).rows[0].rows;
   assert.equal(entries.find(x=>x.id===first).summary,'第一周的总结。');
+  assert.equal(entries.find(x=>x.id===first).month,'2026-08','A historical import must retain its local archive month even when captured in October');
+  assert.equal(entries.find(x=>x.id===first).collected_on,'2026-10-14','The real import date stays accurate');
   assert.equal(entries.find(x=>x.id===other).summary,'正源的总结。');
   assert.equal(entries.find(x=>x.id===next).week_start,'2026-10-21');
   assert.equal(entries.find(x=>x.id===first).owner_id,ids[0]);
