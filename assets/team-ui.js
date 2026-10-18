@@ -1,8 +1,9 @@
-import {favoriteRows} from './favorites.js?v=20261016-original-months';
-import {TeamClient} from './team-client.js?v=20261016-original-months';
-import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel,topicMonth,monthList,matchesPeriod} from './weekly.js?v=20261016-original-months';
+import {CommentsUI} from './comments.js?v=20261018-comments';
+import {favoriteRows} from './favorites.js?v=20261018-comments';
+import {TeamClient} from './team-client.js?v=20261018-comments';
+import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel,topicMonth,monthList,matchesPeriod} from './weekly.js?v=20261018-comments';
 const config=window.VIDEO_COLLECT_TEAM||{},ui=window.VideoCollectUI,$=id=>document.getElementById(id);
-const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261016-original-months';document.head.append(style);
+const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261018-comments';document.head.append(style);
 const bar=document.createElement('section');bar.className='team-bar';bar.setAttribute('aria-label','团队账号');
 bar.innerHTML='<div class="member-cards" id="member-cards" aria-label="成员选题库"></div><div class="team-toolbar"><button id="team-add" class="primary" disabled>新增选题</button><button id="team-refresh" disabled>刷新</button><div class="team-info"><small id="team-member">请登录团队账号</small></div><span id="team-status" class="team-status" role="status"></span><button id="team-agent" hidden>Agent 入库</button><button id="team-login">登录</button><button id="team-logout" hidden>退出</button></div><p id="week-note" class="week-note"></p>';
 document.querySelector('.workspace').before(bar);
@@ -18,7 +19,7 @@ document.querySelector('.month-hint').textContent='月份沿用资料原有分�
 $('sort').options[1].textContent='分类内按点赞数';$('sort').options[2].textContent='分类内按归档顺序';
 document.title=(config.teamName||'团队选题库')+' · 选题中台';
 document.querySelector('.scope-note').textContent='选择成员后按原月份浏览资料；切换周表可查看每次收录记录。成员更新会自动同步。';
-document.querySelector('.library-notes p').textContent='点击封面可放大预览。历史资料按原有月份展示；实际收录时间仍保留在周表中。同一成员在同一周重复收录会合并。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。播放请打开原帖。';
+document.querySelector('.library-notes p').textContent='点击封面可放大预览。历史资料按原有月份展示；实际收录时间仍保留在周表中。同一成员在同一周重复收录会合并。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。点击评论按钮可与团队讨论这条选题，回车发送，Shift + 回车换行。播放请打开原帖。';
 $('delete-title').nextElementSibling.textContent='这条选题会从你的这份周表中隐藏，可在“已删除”中恢复。其他成员和其他周的记录会保留，原平台的视频也不受影响。';
 document.querySelector('.cover-upload').firstChild.textContent='添加或替换这条选题的封面（最大 2 MB）';
 const dialog=document.createElement('dialog');dialog.className='manage-dialog';document.body.append(dialog);
@@ -27,6 +28,7 @@ function close(){dialog.close();dialog.replaceChildren();}
 dialog.addEventListener('cancel',()=>{dialog.replaceChildren();});
 function status(text,error=false){$('team-status').textContent=text;$('team-status').classList.toggle('error',error);}
 let client=null,member=null,busy=false,timer=null,signature='',revision='',generation=0;
+const comments=new CommentsUI({client:()=>client,member:()=>member});
 let favorites=[],favoriteMode=false,favoriteEpoch=0;const favoritePending=new Set();
 let periodMode='month',selectedMonth='all';
 const periodMatches=x=>matchesPeriod(x,{mode:periodMode,month:selectedMonth,week:selectedWeek,date:selectedDate});
@@ -48,7 +50,7 @@ function updateCards(){
 }
 $('my-favorites').onclick=()=>{if(!member)return;favoriteMode=true;updateCards();ui.refreshScope();};
 function account(on){for(const id of ['team-agent','team-logout'])$(id).hidden=!on;for(const id of ['team-refresh','team-add'])$(id).disabled=!on;$('team-login').hidden=on;$('team-member').textContent=on?'当前账号：'+member.name+' · '+member.email:signedOutLabel;updateCards();}
-function clear(){generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];favorites=[];favoriteMode=false;favoritePending.clear();weeks=[];members=memberOrder([]);selectedMember=null;periodMode='month';selectedMonth='all';selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
+function clear(){comments.clear();generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];favorites=[];favoriteMode=false;favoritePending.clear();weeks=[];members=memberOrder([]);selectedMember=null;periodMode='month';selectedMonth='all';selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
 function renderNavigation(all,current){
  const nav=$('month-nav'),focused=nav.contains(document.activeElement)?document.activeElement.dataset.period:null;nav.replaceChildren();
  const name=members.find(m=>m.user_id===selectedMember)?.name||'成员';
@@ -75,6 +77,7 @@ async function refresh(force=false){
   if(busy)return;busy=true;const version=generation,favoriteVersion=favoriteEpoch;
   try{
     const [state,savedFavorites]=await Promise.all([client.weeklyState(),client.favorites()]);if(version!==generation||favoriteVersion!==favoriteEpoch)return;
+    void comments.sync();
     const previous=currentWeek;currentWeek=state.current_week;weeks=state.weeks;members=memberOrder(state.members);if(member){const current=members.find(m=>m.user_id===member.user_id);if(current){member.name=current.name;account(true);}}
     if(!selectedMember)selectedMember=member.user_id;
     if(periodMode==='week'&&previous!==currentWeek&&selectedWeek===previous){selectedWeek=currentWeek;selectedDate='all';}
@@ -99,6 +102,8 @@ async function restore(){
  finally{restoring=false;}
 }
 ui.bind({
+  commentButton:row=>comments.button(row),
+  onScopeChange:()=>comments.close(false),
   selectItems:rows=>!member?[]:favoriteMode?favoriteRows(rows,favorites,selectedMember):rows.filter(x=>x.owner_id===selectedMember),
   favoriteTarget:()=>members.find(m=>m.user_id===selectedMember)?.name||'当前成员',
   isFavorite:x=>favorites.some(f=>f.topic_id===x.topic_id&&f.user_id===selectedMember),

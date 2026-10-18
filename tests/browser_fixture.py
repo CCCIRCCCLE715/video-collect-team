@@ -26,6 +26,15 @@ window.fetch=async(url,o={})=>{
   allFavorites[target]=body.p_favorite?(collection.some(f=>f.topic_id===row.topic_id)?collection:[{user_id:target,topic_id:row.topic_id,entry_id:row.id,created_at:new Date().toISOString()},...collection]):collection.filter(f=>f.topic_id!==row.topic_id);
   localStorage.setItem(store+'-favorites',JSON.stringify(allFavorites));return Response.json(null);
  }
+ const comments=JSON.parse(localStorage.getItem(store+'-comments')||'[]');
+ if(path==='/rest/v1/rpc/topic_comment_counts')return Response.json(Object.fromEntries([...new Set(comments.map(c=>c.entry_id))].map(id=>[id,comments.filter(c=>c.entry_id===id).length])));
+ if(path==='/rest/v1/rpc/list_topic_comments')return Response.json(comments.filter(c=>c.entry_id===body.p_entry_id));
+ if(path==='/rest/v1/rpc/add_topic_comment'){
+  if(window.fixtureCommentDelay)await window.fixtureCommentDelay;
+  if(window.fixtureCommentFailure)return Response.json({message:'模拟断网'},{status:503});
+  if(!comments.some(c=>c.id===body.p_request_id))comments.push({id:body.p_request_id,entry_id:body.p_entry_id,body:body.p_body,user_id:user.user_id,author_name:user.name,created_at:new Date().toISOString()});
+  localStorage.setItem(store+'-comments',JSON.stringify(comments));return Response.json(body.p_request_id);
+ }
  if(path==='/rest/v1/rpc/weekly_library_state')return Response.json({current_week:current,weeks:[{start_date:current,end_date:end}],members,revision:JSON.stringify(read())});
  if(path==='/rest/v1/rpc/list_weekly_topics')return Response.json(read());
  if(path==='/rest/v1/rpc/upsert_topic'){
@@ -48,4 +57,4 @@ window.fetch=async(url,o={})=>{
 '''
 page=(ROOT/'index.html').read_text().replace('<script src="team-config.js" data-team-only></script>','<script>'+script+'</script>').replace('<head>','<head><base href="/">')
 target=ROOT/'data/team-ui-fixture.html';target.parent.mkdir(exist_ok=True);target.write_text(page)
-print('UI fixture: http://127.0.0.1:8798/data/team-ui-fixture.html (simulated cloud only)')
+print('UI fixture: http://127.0.0.1:8804/data/team-ui-fixture.html (simulated cloud only)')

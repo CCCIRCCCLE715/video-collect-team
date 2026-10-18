@@ -81,6 +81,9 @@ export class TeamClient {
   }
   favorites(){return this.request('/rest/v1/topic_favorites?select=user_id,topic_id,entry_id,created_at&order=created_at.desc,topic_id.asc');}
   setFavorite(id,value,memberId,expectedUserId){return this.request('/rest/v1/rpc/set_topic_favorite',{method:'POST',body:{p_entry_id:id,p_favorite:value,p_member_id:memberId},expectedUserId});}
+  commentCounts(){return this.rpc('topic_comment_counts');}
+  comments(id){return this.rpc('list_topic_comments',{p_entry_id:id});}
+  addComment(id,body,requestId,expectedUserId){return this.request('/rest/v1/rpc/add_topic_comment',{method:'POST',body:{p_entry_id:id,p_body:body,p_request_id:requestId},expectedUserId});}
   weeklyState(){return this.rpc('weekly_library_state');}
   async listWeekly(){
     const items=await this.rpc('list_weekly_topics');

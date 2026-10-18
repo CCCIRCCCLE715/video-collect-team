@@ -81,3 +81,11 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 ## 来源
 
 基于 [huangbai-AI/video-collect-website](https://github.com/huangbai-AI/video-collect-website) 修改，沿用 MIT 许可证。
+
+## 团队评论
+
+表格中原来的“仅链接”状态已换成“评论”按钮。点击后在左侧展开评论框；已有评论时，按钮显示评论数量。四位成员都可以查看、追加评论，姓名与当前登录账号对应。评论按发送时间排列，输入框保留在列表下方。
+
+回车发送，Shift + 回车换行；中文输入法选词不会触发发送。发送失败会保留草稿，重试同一次发送不会重复添加。评论保存到云端，其他成员通常在约 5 秒内看到更新。删除选题会隐藏其评论，恢复选题后评论仍在。
+
+首次部署评论功能前，执行 `supabase/migrations/20261018133505_topic_comments.sql`，再发布网页。已有选题、封面和收藏无需重新导入。

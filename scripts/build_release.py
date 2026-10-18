@@ -10,10 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / 'dist'
 PUBLIC_FILES = ['index.html', 'team-config.js', 'README.md', 'LICENSE', 'AGENTS.md', 'package.json', '.gitignore', '.agent.env.example',
-    'assets/favorites.js', 'assets/weekly.js', 'assets/topic.js', 'assets/team-client.js', 'assets/team-ui.js', 'assets/team.css',
+    'assets/comments.js', 'assets/favorites.js', 'assets/weekly.js', 'assets/topic.js', 'assets/team-client.js', 'assets/team-ui.js', 'assets/team.css',
     'scripts/build_local.py', 'scripts/build_release.py', 'scripts/team_import.py',
-    'tests/favorites.test.mjs', 'tests/session.test.mjs', 'tests/weekly.test.mjs', 'tests/weekly-database.test.mjs', 'tests/library.cjs', 'tests/team.test.mjs', 'tests/database.test.mjs', 'tests/test_import.py', 'tests/browser_fixture.py',
-    'supabase/migrations/20261016040936_preserve_original_months.sql', 'supabase/migrations/20261016030222_personal_favorites.sql', 'supabase/migrations/20261014152055_member_identity.sql', 'supabase/migrations/20261014144342_member_weekly_tables.sql', 'supabase/migrations/20261014144452_weekly_tables_cron.sql', 'supabase/config.toml', 'supabase/migrations/202610130001_team.sql',
+    'tests/comments.test.mjs', 'tests/comments-database.test.mjs', 'tests/favorites.test.mjs', 'tests/session.test.mjs', 'tests/weekly.test.mjs', 'tests/weekly-database.test.mjs', 'tests/library.cjs', 'tests/team.test.mjs', 'tests/database.test.mjs', 'tests/test_import.py', 'tests/browser_fixture.py',
+    'supabase/migrations/20261018133505_topic_comments.sql', 'supabase/migrations/20261016040936_preserve_original_months.sql', 'supabase/migrations/20261016030222_personal_favorites.sql', 'supabase/migrations/20261014152055_member_identity.sql', 'supabase/migrations/20261014144342_member_weekly_tables.sql', 'supabase/migrations/20261014144452_weekly_tables_cron.sql', 'supabase/config.toml', 'supabase/migrations/202610130001_team.sql',
     'supabase/functions/agent-import/handler.js', 'supabase/functions/agent-import/index.ts', 'docs/SETUP.md', 'docs/AGENT.md']
 
 def main():
