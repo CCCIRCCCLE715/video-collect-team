@@ -29,10 +29,13 @@ export function identifyPost(value) {
 const text=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
 const metric=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Math.floor(Number(v)):null;
 export function normalizeTopic(input={}) {
+  if(!['reference','topic'].includes(input.entry_type))throw Error('请选择参考视频或选题。');
+  const suggestion=typeof input.topic_suggestion==='string'?input.topic_suggestion.trim():'';
+  if(input.entry_type==='topic'&&(!suggestion||[...suggestion].length>4000))throw Error('请填写视频选题建议，说明做什么主题、准备怎么做（最多 4000 字）。');
   const post=identifyPost(input.url),now=new Date().toISOString();
   const title=text(input.title,1000),author=text(input.author,300),description=text(input.description,20000),summary=text(input.summary,2000);
   const date=text(input.published_at,10),stamp=Date.parse(date),published_at=/^\d{4}-\d{2}-\d{2}$/.test(date)&&!Number.isNaN(stamp)&&new Date(stamp).toISOString().slice(0,10)===date?date:null;
-  return {...post,title:title||'信息待补',author,description,summary,published_at,
+  return {...post,entry_type:input.entry_type,topic_suggestion:input.entry_type==='topic'?suggestion:'',title:title||'信息待补',author,description,summary,published_at,
     month:/^\d{4}-(0[1-9]|1[0-2])$/.test(input.month||'')?input.month:null,
     captured_at:now,likes:metric(input.likes),likes_label:text(input.likes_label,50),duration:metric(input.duration),comments:metric(input.comments),views:metric(input.views),
     kind:'媒体',status:'link',origins:['import'],source_names:['导入'],poster:null,video:null,images:[],

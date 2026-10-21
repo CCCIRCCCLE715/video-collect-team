@@ -22,37 +22,37 @@ const modulePath=new URL('../assets/topic.js',import.meta.url);
 let topic=null;
 if(existsSync(modulePath))topic=await import(modulePath.href);
 test('rounded like labels survive import without inventing an exact count',()=>{
- const x=topic.normalizeTopic({url:'https://www.douyin.com/video/123456789',likes:null,likes_label:'4.1万',duration:15});
+ const x=topic.normalizeTopic({entry_type:'reference',url:'https://www.douyin.com/video/123456789',likes:null,likes_label:'4.1万',duration:15});
  assert.equal(x.likes,null);assert.equal(x.likes_label,'4.1万');assert.equal(x.duration,15);
 });
 test('sharing parameters and Instagram URL variants deduplicate to one post',()=>{
  assert.ok(topic,'shared ingestion module is missing');
- const a=topic.normalizeTopic({url:'https://www.instagram.com/reel/Abc123/?utm_source=copy',title:'教程',summary:'讲解运镜。'});
- const b=topic.normalizeTopic({url:'https://www.instagram.com/creator/reel/Abc123/'});
+ const a=topic.normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/reel/Abc123/?utm_source=copy',title:'教程',summary:'讲解运镜。'});
+ const b=topic.normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/creator/reel/Abc123/'});
  assert.equal(a.id,'instagram:Abc123');assert.equal(b.id,a.id);
  assert.equal(a.url,'https://www.instagram.com/reel/Abc123/');
 });
 test('an untrusted URL cannot become a stored post or executable link',()=>{
  assert.ok(topic,'shared ingestion module is missing');
- for(const url of ['javascript:alert(1)','http://127.0.0.1/private','https://instagram.com.attacker.test/reel/Abc123/','https://www.instagram.com/accounts/login/'])assert.throws(()=>topic.normalizeTopic({url}));
+ for(const url of ['javascript:alert(1)','http://127.0.0.1/private','https://instagram.com.attacker.test/reel/Abc123/','https://www.instagram.com/accounts/login/'])assert.throws(()=>topic.normalizeTopic({entry_type:'reference',url}));
 });
 test('unknown metadata stays pending, and local media paths cannot enter a cloud record',()=>{
  assert.ok(topic,'shared ingestion module is missing');
- const x=topic.normalizeTopic({url:'https://www.douyin.com/video/123456789',poster:'/Users/private/cover.jpg',video:'/tmp/movie.mp4',origins:['like']});
+ const x=topic.normalizeTopic({entry_type:'reference',url:'https://www.douyin.com/video/123456789',poster:'/Users/private/cover.jpg',video:'/tmp/movie.mp4',origins:['like']});
  assert.equal(x.status,'link');assert.equal(x.poster,null);assert.equal(x.video,null);assert.deepEqual(x.origins,['import']);assert.equal(x.metadata_status,'pending');
 });
 test('invalid calendar dates stay unknown and necessary XHS access parameters survive',()=>{
- const x=topic.normalizeTopic({url:'https://www.xiaohongshu.com/explore/1234567890abcdef12345678?xsec_token=abc%3D&utm_source=copy',published_at:'2026-02-30'});
+ const x=topic.normalizeTopic({entry_type:'reference',url:'https://www.xiaohongshu.com/explore/1234567890abcdef12345678?xsec_token=abc%3D&utm_source=copy',published_at:'2026-02-30'});
  assert.equal(x.published_at,null);assert.equal(x.month,null);assert.equal(x.url,'https://www.xiaohongshu.com/explore/1234567890abcdef12345678?xsec_token=abc%3D');
 });
 test('XHS posts opened from a profile deduplicate to the canonical note',()=>{
- const x=topic.normalizeTopic({url:'https://www.xiaohongshu.com/user/profile/bbbbbbbbbbbbbbbbbbbbbbbb/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token=abc%3D&utm_source=copy'});
+ const x=topic.normalizeTopic({entry_type:'reference',url:'https://www.xiaohongshu.com/user/profile/bbbbbbbbbbbbbbbbbbbbbbbb/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token=abc%3D&utm_source=copy'});
  assert.equal(x.id,'xiaohongshu:aaaaaaaaaaaaaaaaaaaaaaaa');
  assert.equal(x.url,'https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token=abc%3D');
 });
 let handler=null;const handlerPath=new URL('../supabase/functions/agent-import/handler.js',import.meta.url);
 if(existsSync(handlerPath))handler=(await import(handlerPath.href)).createHandler;
-const body={topic:{url:'https://www.instagram.com/reel/Abc123/',title:'教程',author:'作者',description:'文案',summary:'讲解运镜。',published_at:'2026-10-13'}};
+const body={topic:{entry_type:'reference',url:'https://www.instagram.com/reel/Abc123/',title:'教程',author:'作者',description:'文案',summary:'讲解运镜。',published_at:'2026-10-13'}};
 function backend(){const state={uploads:[],writes:[]};const fetcher=async(url,options={})=>{
  if(url.endsWith('/rpc/resolve_agent_member'))return Response.json(options.body.includes('valid-token')?'11111111-1111-1111-1111-111111111111':null);
  if(url.includes('/storage/v1/object/')){state.uploads.push(options);return Response.json({Key:'x'});}

@@ -38,22 +38,22 @@ test('database membership, RLS, shared mutations, deduplication and scoped crede
   await assert.rejects(as('authenticated',ids[4],'select list_topics()'),/未加入团队/);
   await assert.rejects(as('authenticated',ids[4],'select library_revision()'),/未加入团队/);
   const initialRevision=(await as('authenticated',ids[0],'select library_revision() as revision')).rows[0].revision;
-  const full=normalizeTopic({url:'https://www.instagram.com/reel/Abc123/',title:'运镜教程',author:'示例作者',summary:'演示环绕运镜。',description:'完整文案',published_at:'2026-10-13',likes:20,month:'2026-09'});
+  const full=normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/reel/Abc123/',title:'运镜教程',author:'示例作者',summary:'演示环绕运镜。',description:'完整文案',published_at:'2026-10-13',likes:20,month:'2026-09'});
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify(full)]);
   assert.notEqual((await as('authenticated',ids[1],'select library_revision() as revision')).rows[0].revision,initialRevision);
   await assert.rejects(as('authenticated',ids[0],'insert into topics(id,data) values($1,$2::jsonb)',['unauthorized','{}']),/permission denied/);
   await assert.rejects(as('authenticated',ids[0],'select upsert_topic_as_member($1,$2::jsonb)',[ids[1],JSON.stringify(full)]),/permission denied/);
   await assert.rejects(as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify({...full,url:'javascript:alert(1)'})]),/链接无效/);
   // Four distinct identities import the same link; missing data must preserve verified metadata.
-  for(let n=1;n<4;n++)await as('authenticated',ids[n],'select upsert_topic($1::jsonb)',[JSON.stringify(normalizeTopic({url:full.url}))]);
+  for(let n=1;n<4;n++)await as('authenticated',ids[n],'select upsert_topic($1::jsonb)',[JSON.stringify(normalizeTopic({entry_type:'reference',url:full.url}))]);
   let rows=(await as('authenticated',ids[2],'select list_topics() as rows')).rows[0].rows;
   assert.equal(rows.length,1);assert.equal(rows[0].title,full.title);assert.equal(rows[0].likes,20);assert.equal(rows[0].description,'完整文案');assert.equal(rows[0].contributors.length,4);
   assert.equal(rows[0].month,'2026-09','Repeated imports retain the original archive month');
-  const rounded=normalizeTopic({url:'https://www.douyin.com/video/123456789',likes:null,likes_label:'4.1万',duration:15});
+  const rounded=normalizeTopic({entry_type:'reference',url:'https://www.douyin.com/video/123456789',likes:null,likes_label:'4.1万',duration:15});
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify(rounded)]);
   const savedRounded=(await as('authenticated',ids[1],'select list_topics() as rows')).rows[0].rows.find(x=>x.id===rounded.id);
   assert.equal(savedRounded.likes_label,'4.1万');assert.equal(savedRounded.likes,undefined);assert.equal(savedRounded.duration,15);
-  const xhs=normalizeTopic({url:'https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token='+('a'.repeat(299)+'=')});
+  const xhs=normalizeTopic({entry_type:'reference',url:'https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token='+('a'.repeat(299)+'=')});
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify(xhs)]);
   assert.ok((await as('authenticated',ids[1],'select list_topics() as rows')).rows[0].rows.some(x=>x.id===xhs.id));
   await assert.rejects(as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify({...xhs,url:xhs.url+'!bad'})]),/链接无效/);
@@ -65,7 +65,7 @@ test('database membership, RLS, shared mutations, deduplication and scoped crede
   await assert.rejects(as('authenticated',ids[1],'insert into storage.objects(bucket_id,name) values(\'covers\',$1)',[cover]),/row-level security/);
   await as('authenticated',ids[0],'insert into storage.objects(bucket_id,name) values(\'covers\',$1)',[cover]);
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb,$2)',[JSON.stringify(full),cover]);
-  await as('authenticated',ids[1],'select upsert_topic($1::jsonb)',[JSON.stringify(normalizeTopic({url:full.url}))]);
+  await as('authenticated',ids[1],'select upsert_topic($1::jsonb)',[JSON.stringify(normalizeTopic({entry_type:'reference',url:full.url}))]);
   assert.equal((await as('authenticated',ids[1],'select list_topics() as rows')).rows[0].rows.find(x=>x.id===full.id).cover_path,cover);
   assert.equal((await as('authenticated',ids[0],'delete from storage.objects where name=$1 returning *',[cover])).rows.length,0,'A referenced cover cannot be removed by a member');
   await assert.rejects(as('authenticated',ids[0],'select upsert_topic($1::jsonb,$2)',[JSON.stringify(full),ids[0]+'/'+'b'.repeat(32)+'.jpg']),/尚未上传/);

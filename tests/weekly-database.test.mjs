@@ -23,7 +23,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   for(const id of ids)await db.query('insert into auth.users(id) values($1)',[id]);
   for(let n=0;n<4;n++)await db.query('insert into team_members values($1,$2)',[ids[n],['黄白','正源','豹朴','弈伶'][n]]);
   const as=async(role,id,sql,args=[])=>{await db.exec(`set role ${role}`);await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);try{return await db.query(sql,args);}finally{await db.exec('reset role');}};
-  const old=normalizeTopic({url:'https://www.instagram.com/reel/Old123/',summary:'原有记录。'});
+  const old=normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/reel/Old123/',summary:'原有记录。'});
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify(old)]);
   await db.exec("update topics set created_at='2026-10-14T12:00:00Z'");
   const files=await readdir(new URL('../supabase/migrations/',import.meta.url));
@@ -47,7 +47,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   for(const [at,want] of [['2026-10-13T15:59:59Z','2026-10-07'],['2026-10-13T16:00:00Z','2026-10-14'],['2026-10-20T15:59:59Z','2026-10-14'],['2026-10-20T16:00:00Z','2026-10-21']]){
    assert.equal((await db.query('select app_private.collection_week($1)::text as week',[at])).rows[0].week,want);
   }
-  const topic={...normalizeTopic({url:'https://www.instagram.com/reel/Weekly123/',summary:'第一周的总结。',month:'2026-08'}),owner_id:ids[3],week_start:'2099-01-01'};
+  const topic={...normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/reel/Weekly123/',summary:'第一周的总结。',month:'2026-08'}),owner_id:ids[3],week_start:'2099-01-01'};
   const capture=async(member,at,input=topic)=>(await db.query('select app_private.capture_topic($1,$2::jsonb,null,$3) as id',[member,JSON.stringify(input),at])).rows[0].id;
   const first=await capture(ids[0],'2026-10-14T02:00:00Z');
   assert.equal(await capture(ids[0],'2026-10-20T15:59:59Z'),first);
@@ -63,7 +63,7 @@ test('weekly collections preserve archives, isolate owners, deduplicate within a
   assert.equal(entries.find(x=>x.id===next).week_start,'2026-10-21');
   assert.equal(entries.find(x=>x.id===first).owner_id,ids[0]);
   assert.equal(entries.find(x=>x.id===first).week_start,'2026-10-14');
-  const browserTopic=normalizeTopic({url:'https://www.instagram.com/reel/Browser123/'});
+  const browserTopic=normalizeTopic({entry_type:'reference',url:'https://www.instagram.com/reel/Browser123/'});
   await as('authenticated',ids[0],'select upsert_topic($1::jsonb)',[JSON.stringify(browserTopic)]);
   assert.equal((await db.query('select count(*)::int as n from member_topic_entries where topic_id=$1',[browserTopic.id])).rows[0].n,1,'Browser and Agent imports must both create a weekly entry');
   await as('authenticated',ids[1],'select set_topic_favorite($1,true)',[first]);

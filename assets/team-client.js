@@ -1,4 +1,4 @@
-import {normalizeTopic,decodeCover} from './topic.js?v=20261014-migration';
+import {normalizeTopic,decodeCover} from './topic.js?v=20261021-types';
 export class TeamClient {
   constructor(config,{fetcher=globalThis.fetch.bind(globalThis),storage=localStorage}={}){
     this.url=config.supabaseUrl.replace(/\/$/,'');this.key=config.publishableKey;
@@ -89,6 +89,7 @@ export class TeamClient {
     const items=await this.rpc('list_weekly_topics');
     await Promise.all(items.map(async x=>{x.poster=null;if(x.cover_path)try{x.poster=await this.signedCover(x.cover_path);}catch{x.cover_error=true;}}));return items;
   }
+  setEntryType(id,type,suggestion,expectedUserId){return this.request('/rest/v1/rpc/set_entry_type',{method:'POST',body:{p_id:id,p_type:type,p_suggestion:suggestion},expectedUserId});}
   setEntryDeleted(id,deleted){return this.rpc('set_entry_deleted',{p_id:id,p_deleted:deleted});}
   async replaceEntryCover(id,file){
     let path=null;

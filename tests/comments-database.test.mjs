@@ -24,7 +24,7 @@ test('teammates append comments as themselves; retries deduplicate and outsiders
   for(const id of ids)await db.query('insert into auth.users values($1,$2)',[id,id+'@test.invalid']);
   for(let i=0;i<2;i++)await db.query('insert into team_members(user_id,name) values($1,$2)',[ids[i],['黄白','正源'][i]]);
   const as=async(role,id,sql,args=[])=>{await db.exec('set role '+role);await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);try{return await db.query(sql,args);}finally{await db.exec('reset role');}};
-  const entry=(await db.query(`select app_private.capture_topic($1,$2::jsonb,null,'2026-10-18T00:00:00Z') as id`,[ids[0],JSON.stringify({id:'instagram:Comments1',platform:'instagram',url:'https://www.instagram.com/reel/Comments1/',title:'评论测试'})])).rows[0].id;
+  const entry=(await db.query(`select app_private.capture_topic($1,$2::jsonb,null,'2026-10-18T00:00:00Z') as id`,[ids[0],JSON.stringify({entry_type:'reference',id:'instagram:Comments1',platform:'instagram',url:'https://www.instagram.com/reel/Comments1/',title:'评论测试'})])).rows[0].id;
   assert.deepEqual((await as('authenticated',ids[0],'select topic_comment_counts() as counts')).rows[0].counts,{});
   const request='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   await as('authenticated',ids[0],'select add_topic_comment($1,$2,$3)',[entry,'  想试试这个运镜  ',request]);

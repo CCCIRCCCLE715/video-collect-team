@@ -1,15 +1,15 @@
-import {CommentsUI} from './comments.js?v=20261018-comments';
-import {favoriteRows} from './favorites.js?v=20261018-comments';
-import {TeamClient} from './team-client.js?v=20261018-comments';
-import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel,topicMonth,monthList,matchesPeriod} from './weekly.js?v=20261018-comments';
+import {CommentsUI} from './comments.js?v=20261021-types';
+import {favoriteRows} from './favorites.js?v=20261021-types';
+import {TeamClient} from './team-client.js?v=20261021-types';
+import {MEMBER_NAMES,memberOrder,weekStart,weekDates,weekLabel,topicMonth,monthList,matchesPeriod} from './weekly.js?v=20261021-types';
 const config=window.VIDEO_COLLECT_TEAM||{},ui=window.VideoCollectUI,$=id=>document.getElementById(id);
-const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261018-comments';document.head.append(style);
+const style=document.createElement('link');style.rel='stylesheet';style.href='assets/team.css?v=20261021-types';document.head.append(style);
 const bar=document.createElement('section');bar.className='team-bar';bar.setAttribute('aria-label','团队账号');
-bar.innerHTML='<div class="member-cards" id="member-cards" aria-label="成员选题库"></div><div class="team-toolbar"><button id="team-add" class="primary" disabled>新增选题</button><button id="team-refresh" disabled>刷新</button><div class="team-info"><small id="team-member">请登录团队账号</small></div><span id="team-status" class="team-status" role="status"></span><button id="team-agent" hidden>Agent 入库</button><button id="team-login">登录</button><button id="team-logout" hidden>退出</button></div><p id="week-note" class="week-note"></p>';
+bar.innerHTML='<div class="library-sections" aria-label="资料分类"><button type="button" id="section-reference" aria-pressed="true">参考视频</button><button type="button" id="section-topic" aria-pressed="false">选题</button></div><div class="member-cards" id="member-cards" aria-label="成员选题库"></div><div class="team-toolbar"><button id="team-add" class="primary" disabled>新增链接</button><button id="team-refresh" disabled>刷新</button><div class="team-info"><small id="team-member">请登录团队账号</small></div><span id="team-status" class="team-status" role="status"></span><button id="team-agent" hidden>Agent 入库</button><button id="team-login">登录</button><button id="team-logout" hidden>退出</button></div><p id="week-note" class="week-note"></p>';
 document.querySelector('.workspace').before(bar);
 const signedOutLabel='请登录团队账号';
 $('team-member').textContent=signedOutLabel;
-document.querySelector('.intro').textContent='按成员、原月份和平台整理视频选题。历史资料保留原有月份，也可切换周表查看收录记录。';
+document.querySelector('.intro').textContent='参考视频收录值得借鉴的案例；选题记录准备做什么主题、怎么做。两区按成员和周表分别整理。';
 document.querySelector('.console-status').textContent='TEAM LIBRARY';
 document.querySelector('.month-panel').setAttribute('aria-label','日期导航');
 document.querySelector('.month-panel h2').textContent='月份与周表';
@@ -19,16 +19,18 @@ document.querySelector('.month-hint').textContent='月份沿用资料原有分�
 $('sort').options[1].textContent='分类内按点赞数';$('sort').options[2].textContent='分类内按归档顺序';
 document.title=(config.teamName||'团队选题库')+' · 选题中台';
 document.querySelector('.scope-note').textContent='选择成员后按原月份浏览资料；切换周表可查看每次收录记录。成员更新会自动同步。';
-document.querySelector('.library-notes p').textContent='点击封面可放大预览。历史资料按原有月份展示；实际收录时间仍保留在周表中。同一成员在同一周重复收录会合并。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。点击评论按钮可与团队讨论这条选题，回车发送，Shift + 回车换行。播放请打开原帖。';
+document.querySelector('.library-notes p').textContent='点击封面可放大预览。历史资料按原有月份展示；实际收录时间仍保留在周表中。同一成员同一周、同一分类的重复链接会合并。参考视频和选题可分别保留，选题须填写制作建议。大家可以查看全部成员的表，封面替换、删除和恢复只能操作自己收录的条目，其他成员和往期表中的同一视频会继续保留。点击评论按钮可与团队讨论这条选题，回车发送，Shift + 回车换行。播放请打开原帖。';
 $('delete-title').nextElementSibling.textContent='这条选题会从你的这份周表中隐藏，可在“已删除”中恢复。其他成员和其他周的记录会保留，原平台的视频也不受影响。';
 document.querySelector('.cover-upload').firstChild.textContent='添加或替换这条选题的封面（最大 2 MB）';
-const dialog=document.createElement('dialog');dialog.className='manage-dialog';document.body.append(dialog);
+const dialog=document.createElement('dialog');dialog.className='manage-dialog';dialog.id='team-dialog';document.body.append(dialog);
 function show(title,body){dialog.replaceChildren();const h=document.createElement('h2');h.textContent=title;dialog.append(h);const box=document.createElement('div');box.innerHTML=body;dialog.append(box);dialog.setAttribute('aria-label',title);dialog.showModal();return box;}
 function close(){dialog.close();dialog.replaceChildren();}
 dialog.addEventListener('cancel',()=>{dialog.replaceChildren();});
 function status(text,error=false){$('team-status').textContent=text;$('team-status').classList.toggle('error',error);}
 let client=null,member=null,busy=false,timer=null,signature='',revision='',generation=0;
 const comments=new CommentsUI({client:()=>client,member:()=>member});
+let entryType='reference';
+const typeOf=x=>x.entry_type||'reference',typeLabel=()=>entryType==='topic'?'选题':'参考视频',typeMatches=x=>typeOf(x)===entryType;
 let favorites=[],favoriteMode=false,favoriteEpoch=0;const favoritePending=new Set();
 let periodMode='month',selectedMonth='all';
 const periodMatches=x=>matchesPeriod(x,{mode:periodMode,month:selectedMonth,week:selectedWeek,date:selectedDate});
@@ -41,21 +43,23 @@ const cardButtons=MEMBER_NAMES.map((name,index)=>{
  $('member-cards').append(b);return b;
 });
 function updateCards(){
+ for(const type of ['reference','topic'])$('section-'+type).setAttribute('aria-pressed',String(!favoriteMode&&entryType===type));
  members=memberOrder(members);
  cardButtons.forEach((b,i)=>{const m=members[i];b.disabled=!member||!m.user_id;b.setAttribute('aria-pressed',selectedMember===m.user_id&&!!member?'true':'false');
-  b.querySelector('span').textContent=member?(favoriteMode?favoriteRows(catalog,favorites,m.user_id).length+' 条收藏':catalog.filter(x=>x.owner_id===m.user_id&&periodMatches(x)&&!x.deleted_at).length+' 条选题'):'登录后查看';
-  b.querySelector('small').textContent=member?(m.user_id===member.user_id?(favoriteMode?'我的收藏':'我的选题'):m.user_id?(favoriteMode?'查看收藏':'查看选题'):'尚未绑定账号'):'每周独立收录';});
+  b.querySelector('span').textContent=member?(favoriteMode?favoriteRows(catalog,favorites,m.user_id).length+' 条收藏':catalog.filter(x=>x.owner_id===m.user_id&&typeMatches(x)&&periodMatches(x)&&!x.deleted_at).length+' 条'+typeLabel()):'登录后查看';
+  b.querySelector('small').textContent=member?(m.user_id===member.user_id?(favoriteMode?'我的收藏':'我的'+typeLabel()):m.user_id?(favoriteMode?'查看收藏':'查看'+typeLabel()):'尚未绑定账号'):'每周独立收录';});
  $('my-favorites').disabled=!member;$('my-favorites').setAttribute('aria-pressed',String(favoriteMode));$('my-favorites').querySelector('small').textContent=member?favoriteRows(catalog,favorites,selectedMember).length:0;
  $('week-note').textContent=favoriteMode?'收藏库 · 团队共同维护 · 跨周保留':periodMode==='month'?'按资料原月份归档 · '+periodTitle():'每周三 00:00 自动更新 · 北京时间 · '+(selectedWeek==='all'?'全部周表':weekLabel(selectedWeek));
 }
+for(const type of ['reference','topic'])$('section-'+type).onclick=()=>{entryType=type;favoriteMode=false;updateCards();ui.refreshScope();};
 $('my-favorites').onclick=()=>{if(!member)return;favoriteMode=true;updateCards();ui.refreshScope();};
 function account(on){for(const id of ['team-agent','team-logout'])$(id).hidden=!on;for(const id of ['team-refresh','team-add'])$(id).disabled=!on;$('team-login').hidden=on;$('team-member').textContent=on?'当前账号：'+member.name+' · '+member.email:signedOutLabel;updateCards();}
 function clear(){comments.clear();generation++;clearTimeout(timer);signature='';revision='';member=null;catalog=[];favorites=[];favoriteMode=false;favoritePending.clear();weeks=[];members=memberOrder([]);selectedMember=null;periodMode='month';selectedMonth='all';selectedWeek=weekStart();selectedDate='all';ui.refreshScope();ui.replaceCatalog([]);account(false);}
 function renderNavigation(all,current){
  const nav=$('month-nav'),focused=nav.contains(document.activeElement)?document.activeElement.dataset.period:null;nav.replaceChildren();
  const name=members.find(m=>m.user_id===selectedMember)?.name||'成员';
- $('current-heading').textContent=member?(favoriteMode?name+' · 收藏库':name+' · '+periodTitle()):'成员选题库';
- $('current-description').textContent=member?(favoriteMode?'已收藏 '+current.length+' 条 · 跨周保留 · '+'团队成员均可添加或取消收藏':'收录 '+current.length+' 条 · 按平台查看 · '+(selectedMember===member.user_id?'可维护自己的选题':'正在查看其他成员的选题')):'登录后按原月份查看成员选题';
+ $('current-heading').textContent=member?(favoriteMode?name+' · 收藏库':name+' · '+typeLabel()+' · '+periodTitle()):'参考视频与选题';
+ $('current-description').textContent=member?(favoriteMode?'已收藏 '+current.length+' 条 · 跨周保留 · '+'团队成员均可添加或取消收藏':'收录 '+current.length+' 条 · 按平台查看 · '+(selectedMember===member.user_id?'可维护自己的'+typeLabel():'正在查看其他成员的'+typeLabel())):'登录后按原月份查看成员选题';
  if(favoriteMode)all=catalog.filter(x=>x.owner_id===selectedMember&&!x.deleted_at);
  const modes=document.createElement('div');modes.className='period-modes';modes.setAttribute('aria-label','归档方式');
  for(const [mode,label] of [['month','按月份'],['week','按周表']]){const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.period='mode-'+mode;b.setAttribute('aria-pressed',String(periodMode===mode));b.onclick=()=>{favoriteMode=false;periodMode=mode;selectedDate='all';updateCards();ui.refreshScope();};modes.append(b);}nav.append(modes);
@@ -88,7 +92,7 @@ async function refresh(force=false){
     catalog=rows;updateCards();if(force||next!==signature||revision!==currentRevision){ui.replaceCatalog(rows);signature=next;}
     revision=rows.some(x=>x.cover_error)?'':currentRevision;
     status(rows.some(x=>x.cover_error)?'部分封面暂时无法加载，稍后会重试':'已同步 · '+new Date().toLocaleTimeString('zh-CN',{hour12:false}));
-    if(!$('rows').children.length)$('empty').textContent=favoriteMode?'还没有收藏的视频。点击封面左侧的星星即可收藏。':'当前成员在所选月份或日期还没有选题。可切换月份或周表查看。';
+    if(!$('rows').children.length)$('empty').textContent=favoriteMode?'还没有收藏的视频。点击封面左侧的星星即可收藏。':'当前成员在这个分类和日期下还没有记录。可切换分类、月份或周表查看。';
   }catch(e){status('同步失败：'+e.message,true);if(!client.session||e.status===403){clear();await client.logout();ui.message(e.status===403?'你已不在团队成员列表中，请联系管理员。':'登录已过期，请重新登录。');}}
   finally{busy=false;}
 }
@@ -101,10 +105,49 @@ async function restore(){
  catch(e){status(e.message,true);clear();if(!client.session||e.status===403){await client.logout();}else{status('暂时无法连接，登录状态已保留，联网后自动重试。',true);$('team-logout').hidden=false;poll();}}
  finally{restoring=false;}
 }
+
+function entryDetails(row){
+ if(typeOf(row)!=='topic')return null;
+ const box=document.createElement('section');box.className='topic-suggestion';
+ const title=document.createElement('strong');title.textContent='视频选题建议';
+ const text=document.createElement('p');text.className='topic-suggestion-text';text.tabIndex=0;text.textContent=row.topic_suggestion||'待补充选题建议';
+ box.append(title,text);return box;
+}
+function entryAction(row){
+ if(!member||row.owner_id!==member.user_id)return null;
+ const b=document.createElement('button');b.type='button';b.className='entry-edit';b.textContent=typeOf(row)==='topic'?'修改建议 / 分类':'转为选题';
+ b.onclick=()=>{
+  const owner=member.user_id,version=generation;
+  const box=show('修改分类与选题建议','<form class="team-form"><fieldset class="type-choices"><legend>这条视频用于什么？</legend><label><input type="radio" name="entry_type" value="reference" required>参考视频</label><label><input type="radio" name="entry_type" value="topic" required>选题</label></fieldset><label data-suggestion>视频选题建议<textarea name="topic_suggestion" maxlength="4000" placeholder="这个视频适合做什么主题？描述一下准备怎么做。"></textarea></label><small>转移后保留原周表、封面、收藏和评论；只有选题需要填写建议。</small><p role="status"></p><div class="dialog-actions"><button class="primary" type="submit">保存</button><button type="button" data-close>取消</button></div></form>');
+  const f=box.querySelector('form'),area=f.querySelector('textarea'),choice=f.querySelector('[value="'+(typeOf(row)==='reference'?'topic':typeOf(row))+'"]');choice.checked=true;area.value=row.topic_suggestion||'';
+  const update=()=>{const topic=new FormData(f).get('entry_type')==='topic';f.querySelector('[data-suggestion]').hidden=!topic;area.required=topic;};update();f.onchange=update;
+  box.querySelector('[data-close]').onclick=close;
+  f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在保存…';try{const type=new FormData(f).get('entry_type');await client.setEntryType(row.id,type,area.value,owner);if(version!==generation)return;favoriteMode=false;entryType=type;await refresh(true);updateCards();ui.refreshScope();close();ui.message('分类和选题建议已保存。');}catch(err){msg.textContent=err.message;}finally{b.disabled=false;}};
+ };
+ return b;
+}
+function openAdd(){
+ const owner=member.user_id,version=generation;
+ const box=show('新增链接 · '+member.name+' · '+weekLabel(currentWeek),'<form class="team-form"><div data-details><label>原帖链接<input name="url" type="url" placeholder="粘贴完整视频链接" required></label><div class="form-grid"><label>标题<input name="title" maxlength="1000"></label><label>作者<input name="author" maxlength="300"></label><label>发布时间<input name="published_at" type="date"></label><label>点赞数<input name="likes" type="number" min="0"></label></div><label>一句话总结<textarea name="summary" maxlength="2000"></textarea></label><label>原帖文案<textarea name="description" maxlength="20000"></textarea></label><label>原帖封面<input name="cover" type="file" accept="image/jpeg,image/png,image/webp"></label><small>保存到当前登录成员的本周表。不确定的信息留空；已配置的 Agent 可读取原帖信息和封面。</small></div><div data-category hidden><h3>这是参考视频还是选题？</h3><div class="category-options"><button type="button" data-type="reference"><strong>参考视频</strong><span>保存好看的案例、画面或做法，供后续借鉴。</span></button><button type="button" data-type="topic"><strong>选题</strong><span>准备用这个案例单独做一期视频，继续填写选题建议。</span></button></div></div><label data-suggestion hidden>视频选题建议<textarea name="topic_suggestion" maxlength="4000" placeholder="这个视频适合做什么主题？描述一下准备怎么做。"></textarea><small>例如：做一期 AI 桌宠入门教程，展示提示词、制作步骤和最终效果。</small></label><p role="status" aria-live="polite"></p><div class="dialog-actions"><button type="submit" class="primary" data-save>下一步</button><button type="button" data-back hidden>返回</button><button type="button" data-close>取消</button></div></form>');
+ const f=box.querySelector('form'),msg=f.querySelector('[role=status]'),submit=f.querySelector('[data-save]'),back=f.querySelector('[data-back]'),area=f.querySelector('[name=topic_suggestion]');
+ let stage='details',type=null,saving=false;
+ const go=value=>{stage=value;f.querySelector('[data-details]').hidden=value!=='details';f.querySelector('[data-category]').hidden=value!=='category';f.querySelector('[data-suggestion]').hidden=value!=='suggestion';area.required=value==='suggestion';submit.hidden=value==='category';submit.textContent=value==='suggestion'?'保存到我的选题表':'下一步';back.hidden=value==='details';msg.textContent='';if(value==='category')f.querySelector('[data-type=reference]').focus();if(value==='suggestion')area.focus();};
+ box.querySelector('[data-close]').onclick=close;back.onclick=()=>go(stage==='suggestion'?'category':'details');
+ const save=async()=>{
+  if(saving)return;saving=true;const buttons=[...f.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);msg.textContent='正在保存…';
+  try{const input={...Object.fromEntries(new FormData(f)),entry_type:type};await client.upsert(input,f.querySelector('[name=cover]').files[0]||null,owner);if(version!==generation)return;favoriteMode=false;entryType=type;selectedMember=owner;selectedWeek=currentWeek;selectedDate='all';await refresh(true);updateCards();ui.refreshScope();close();ui.message('已保存到你的本周'+typeLabel()+'表。');}
+  catch(err){msg.textContent=err.message;}
+  finally{saving=false;buttons.forEach(b=>b.disabled=false);}
+ };
+ f.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{type=b.dataset.type;if(type==='topic')go('suggestion');else void save();});
+ f.onsubmit=e=>{e.preventDefault();if(stage==='details')go('category');else if(stage==='suggestion')void save();};
+}
 ui.bind({
   commentButton:row=>comments.button(row),
+  entryDetails:row=>entryDetails(row),
+  entryAction:row=>entryAction(row),
   onScopeChange:()=>comments.close(false),
-  selectItems:rows=>!member?[]:favoriteMode?favoriteRows(rows,favorites,selectedMember):rows.filter(x=>x.owner_id===selectedMember),
+  selectItems:rows=>!member?[]:favoriteMode?favoriteRows(rows,favorites,selectedMember):rows.filter(x=>x.owner_id===selectedMember&&typeMatches(x)),
   favoriteTarget:()=>members.find(m=>m.user_id===selectedMember)?.name||'当前成员',
   isFavorite:x=>favorites.some(f=>f.topic_id===x.topic_id&&f.user_id===selectedMember),
   favoriteBusy:x=>favoritePending.has(x.topic_id),
@@ -138,11 +181,7 @@ if(!config.supabaseUrl||!config.publishableKey){
     };
     $('team-logout').onclick=async()=>{clear();close();status('已退出');await client.logout();};
     $('team-refresh').onclick=()=>refresh(true);
-    $('team-add').onclick=()=>{
-      const box=show('新增视频选题 · '+member.name+' · '+weekLabel(currentWeek),'<form class="team-form"><label>原帖链接<input name="url" type="url" placeholder="粘贴完整视频链接" required></label><div class="form-grid"><label>标题<input name="title" maxlength="1000"></label><label>作者<input name="author" maxlength="300"></label><label>发布时间<input name="published_at" type="date"></label><label>点赞数<input name="likes" type="number" min="0"></label></div><label>一句话总结<textarea name="summary" maxlength="2000"></textarea></label><label>原帖文案<textarea name="description" maxlength="20000"></textarea></label><label>原帖封面<input name="cover" type="file" accept="image/jpeg,image/png,image/webp"></label><small>内容归入当前登录账号的选题表。不确定的信息留空。想自动读取信息和封面，可将链接发给已配置的 Agent。</small><p role="status"></p><div class="dialog-actions"><button type="submit" class="primary">保存到我的本周表</button><button type="button" data-close>取消</button></div></form>');
-      box.querySelector('[data-close]').onclick=close;
-      box.querySelector('form').onsubmit=async e=>{e.preventDefault();const f=e.target,b=f.querySelector('[type=submit]'),msg=f.querySelector('[role=status]');b.disabled=true;msg.textContent='正在保存…';try{const input=Object.fromEntries(new FormData(f));await client.upsert(input,f.cover.files[0]||null,member.user_id);favoriteMode=false;selectedMember=member.user_id;selectedWeek=currentWeek;selectedDate='all';await refresh(true);ui.refreshScope();close();ui.message('已保存到你的本周表。重复链接会合并；已删除的记录可在“已删除”中恢复。');}catch(err){msg.textContent=err.message;}finally{b.disabled=false;}};
-    };
+    $('team-add').onclick=()=>openAdd();
     $('team-agent').onclick=()=>{
       const box=show('连接你的 Agent','<div class="team-form"><p class="team-help">为自己的 Agent 生成一份入库凭证。它可以新增信息和封面，不能读取选题库或删除记录。重新生成后，旧凭证立即失效。</p><button class="primary" data-mint>生成 / 重置入库凭证</button><label>入库凭证<input type="password" class="token" readonly data-token autocomplete="off" placeholder="点击生成，凭证默认隐藏"></label><button type="button" data-copy>复制凭证</button><small>将凭证保存到你本机的 .agent.env 中，不要发到群聊或提交到 GitHub。关闭此窗口后不再显示。</small><p><a href="docs/AGENT.md" target="_blank" rel="noopener">查看 Agent 接入步骤 ↗</a></p><p role="status"></p><div class="dialog-actions"><button data-revoke>撤销凭证</button><button data-close>关闭</button></div></div>');
       box.querySelector('[data-close]').onclick=close;

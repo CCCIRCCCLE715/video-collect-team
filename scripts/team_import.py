@@ -46,8 +46,13 @@ def read_cover(path):
 def make_payload(row, base, explicit_cover=None):
     if not isinstance(row, dict) or not row.get('url'):
         raise ValueError('每条选题需要原帖 url。')
+    if row.get('entry_type') not in ('reference', 'topic'):
+        raise ValueError('请询问成员：这是参考视频还是选题？明确后填写 entry_type（reference / topic）。')
+    suggestion = row.get('topic_suggestion', '')
+    if row['entry_type'] == 'topic' and (not isinstance(suggestion, str) or not suggestion.strip() or len(suggestion.strip()) > 4000):
+        raise ValueError('请询问成员的视频选题建议：做什么主题、准备怎么做？填写 topic_suggestion（最多 4000 字）后入库。')
     # No cookies, credentials, local paths, ownership fields or cached signed URLs.
-    fields = ('url', 'title', 'author', 'description', 'summary', 'summary_basis', 'published_at', 'month', 'likes', 'likes_label', 'duration', 'comments', 'views')
+    fields = ('entry_type', 'topic_suggestion', 'url', 'title', 'author', 'description', 'summary', 'summary_basis', 'published_at', 'month', 'likes', 'likes_label', 'duration', 'comments', 'views')
     payload = {'topic': {k: row[k] for k in fields if k in row}}
     poster = explicit_cover or row.get('poster')
     if poster:
